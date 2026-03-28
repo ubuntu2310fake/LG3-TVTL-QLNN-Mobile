@@ -1,0 +1,53 @@
+name: lg3_tvtl_qlnn
+description: "Phần mềm tư vấn tâm lý và quản lý thi đua - trường THPT Lạng Giang 3"
+publish_to: 'none'
+version: 1.0.3+3
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0              
+  shared_preferences: ^2.2.2 
+  mobile_scanner: ^5.0.0
+  path_provider: ^2.1.2   
+  encrypt: ^5.0.3         
+  flutter_launcher_icons: ^0.13.1
+  cupertino_icons: ^1.0.8
+  firebase_core: ^4.5.0
+  firebase_messaging: ^16.1.2
+  image_picker: ^1.2.1
+  device_info_plus: ^12.3.0
+  intl: ^0.20.2
+  image_cropper: ^11.0.0
+  google_fonts: ^8.0.2
+  dio: ^5.4.1               
+  open_filex: ^4.3.4        
+  permission_handler: ^11.3.0 
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/lg3512512.png" 
+  min_sdk_android: 21
+
+# BẮT ĐẦU PHẦN CẤU HÌNH FLUTTER (PHẢI SÁT LỀ TRÁI)
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/lg3512512.png
+    - assets/images/lg3100100.png
+
+  fonts:
+    - family: Inter
+      fonts:
+        # TÊN FILE KHỚP VỚI ẢNH CHỤP
+        - asset: assets/fonts/Inter-VariableFont_opsz,wght.ttf

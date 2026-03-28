@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "857479849856",
+    "project_id": "nenneppro",
+    "storage_bucket": "nenneppro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:857479849856:android:cc6e54eda5169d9d040365",
+        "android_client_info": {
+          "package_name": "com.lg3.quan_ly_nen_nep"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0-eWHDbLZbHueR1kbSpoqnwLQsBU-4jA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
