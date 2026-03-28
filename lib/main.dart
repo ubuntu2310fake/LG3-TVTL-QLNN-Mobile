@@ -11,7 +11,7 @@ import 'main_shell.dart';
 // ==========================================
 // KHAI BÁO BIẾN TOÀN CỤC (Chỉ sửa ở đây)
 // ==========================================
-const String currentAppVersion = "1.0.3_r1";
+const String currentAppVersion = "1.0.4_r1";
 
 // BIẾN TOÀN CỤC ĐỂ ĐIỀU KHIỂN THEME TOÀN APP
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);

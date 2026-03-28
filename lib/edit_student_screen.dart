@@ -47,8 +47,12 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         _dobCtrl.text = _student['dob'] ?? ''; 
         _classId = _student['class_id'];
         _currentImageUrl = _student['image_url'];
+        
+        // --- ÉP KIỂU AN TOÀN CHO DỮ LIỆU TỪ PHP ---
         _userRole = data['linked_user']?['role'] ?? 'STUDENT';
-        _standingClassId = data['linked_user']?['homeroom_class_id'];
+        var rawStandingId = data['linked_user']?['homeroom_class_id'];
+        _standingClassId = rawStandingId != null ? int.tryParse(rawStandingId.toString()) : null;
+        
         _isLoading = false;
       });
     }
@@ -124,7 +128,6 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- BOX XỬ LÝ YÊU CẦU THAY ĐỔI ---
             if (hasPending) 
               Container(
                 padding: const EdgeInsets.all(16), margin: const EdgeInsets.only(bottom: 20),
@@ -151,7 +154,6 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
                 )
               ),
 
-            // --- KHU VỰC AVATAR ---
             Center(
               child: Stack(
                 children: [
@@ -177,7 +179,6 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
             
             const SizedBox(height: 20),
 
-            // --- THÔNG TIN CƠ BẢN ---
             TextField(controller: TextEditingController(text: _student['code']), decoration: InputDecoration(labelText: 'Mã HS (SBD)', border: const OutlineInputBorder(), filled: true, fillColor: isDark ? Colors.grey[800] : const Color(0xFFF5F5F5)), readOnly: true), const SizedBox(height: 15),
             TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Họ và tên', border: OutlineInputBorder())), const SizedBox(height: 15),
             TextField(controller: _dobCtrl, decoration: const InputDecoration(labelText: 'Ngày sinh (DD/MM/YYYY)', border: OutlineInputBorder())), const SizedBox(height: 15),
@@ -189,7 +190,6 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
             
             const Divider(height: 40),
             
-            // --- PHÂN QUYỀN (CHỈ CÓ NHƯ WEB) ---
             DropdownButtonFormField<String>(
               decoration: const InputDecoration(labelText: 'Quyền hạn (User)', border: OutlineInputBorder()),
               value: _userRole, 

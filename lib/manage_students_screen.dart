@@ -93,7 +93,34 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                     child: s['image_url'] == null ? const Icon(Icons.person) : null,
                   ),
                   title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("${s['code']} - Lớp: ${s['class_name']}"),
+                  // --- BỔ SUNG HIỂN THỊ BADGE CỜ ĐỎ DƯỚI TÊN ---
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("${s['code']} - Lớp: ${s['class_name']}"),
+                      if (s['role'] == 'RED_FLAG')
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            border: Border.all(color: Colors.red.shade200),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.flag, color: Colors.red, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Cờ đỏ ${s['homeroom_class_name'] ?? ''}', 
+                                style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -107,7 +134,6 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
             ),
           ),
           
-          // --- THANH PHÂN TRANG FIX DARK MODE ---
           if (!_isLoading && _totalPages > 1)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
