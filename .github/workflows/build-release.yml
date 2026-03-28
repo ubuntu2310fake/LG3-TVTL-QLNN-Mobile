@@ -1,0 +1,61 @@
+name: Build & Release LG3 App
+
+on:
+  push:
+    tags:
+      - '*' # Bắt mọi loại Tag (vd: 1.0.3_r1)
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK and Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "📥 Tải mã nguồn"
+        uses: actions/checkout@v3
+
+      - name: "☕ Cài đặt Java 17 (CÓ CACHE GRADLE ĐỂ CHẠY NHANH)"
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle' # <-- Động cơ Turbo ở đây
+
+      - name: "🦋 Cài đặt Flutter (CÓ CACHE FLUTTER)"
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true # <-- Động cơ Turbo số 2
+
+      - name: "📦 Cài thư viện phụ thuộc"
+        run: flutter pub get
+
+      - name: "🚀 1. Build bản Split"
+        run: flutter build apk --split-per-abi
+
+      - name: "🔧 2. Ma thuật DevOps: Xóa đuôi _r1"
+        run: |
+          sed -i 's/_r1";/";/g' lib/main.dart
+
+      - name: "🚀 3. Build bản Universal"
+        run: flutter build apk
+
+      - name: "🏷️ Đổi tên file cho chuẩn API"
+        run: |
+          cd build/app/outputs/flutter-apk/
+          mv app-arm64-v8a-release.apk LG3_TVTL_QLNN_Android_arm64-v8a.apk
+          mv app-armeabi-v7a-release.apk LG3_TVTL_QLNN_Android_armeabi-v7a.apk
+          mv app-release.apk LG3_TVTL_QLNN_Android.apk
+
+      - name: "📤 Ép đẩy file lên Release GitHub"
+        uses: softprops/action-gh-release@v1
+        # BỎ LUÔN DÒNG IF ĐỂ ÉP NÓ UPLOAD 100%
+        with:
+          files: |
+            build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android_arm64-v8a.apk
+            build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android_armeabi-v7a.apk
+            build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
