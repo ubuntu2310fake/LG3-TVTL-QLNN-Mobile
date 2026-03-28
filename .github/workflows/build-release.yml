@@ -39,7 +39,8 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo $KEYSTORE_BASE64 | base64 --decode > android/app/lg3-release.jks
+          # ĐÃ SỬA: Thêm ngoặc kép và cờ --ignore-garbage (-i)
+          echo "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > android/app/lg3-release.jks
           echo "storePassword=$STORE_PASSWORD" > android/key.properties
           echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
