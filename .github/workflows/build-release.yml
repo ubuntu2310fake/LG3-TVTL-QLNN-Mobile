@@ -3,7 +3,7 @@ name: Build & Release LG3 App
 on:
   push:
     tags:
-      - '*' # Bắt mọi loại Tag (vd: 1.0.3_r1)
+      - '*' 
   workflow_dispatch:
 
 jobs:
@@ -20,16 +20,31 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-          cache: 'gradle' # <-- Động cơ Turbo ở đây
+          cache: 'gradle' 
 
       - name: "🦋 Cài đặt Flutter (CÓ CACHE FLUTTER)"
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true # <-- Động cơ Turbo số 2
+          cache: true 
 
       - name: "📦 Cài thư viện phụ thuộc"
         run: flutter pub get
+
+      # --- BƯỚC NÀY LẦN TRƯỚC SẾP QUÊN CHƯA CHO VÀO NÀY ---
+      - name: "🔐 Giải mã Chữ ký số LG3"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo $KEYSTORE_BASE64 | base64 --decode > android/app/lg3-release.jks
+          echo "storePassword=$STORE_PASSWORD" > android/key.properties
+          echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
+          echo "keyAlias=$KEY_ALIAS" >> android/key.properties
+          echo "storeFile=lg3-release.jks" >> android/key.properties
+      # ----------------------------------------------------
 
       - name: "🚀 1. Build bản Split"
         run: flutter build apk --split-per-abi
@@ -50,7 +65,6 @@ jobs:
 
       - name: "📤 Ép đẩy file lên Release GitHub"
         uses: softprops/action-gh-release@v1
-        # BỎ LUÔN DÒNG IF ĐỂ ÉP NÓ UPLOAD 100%
         with:
           files: |
             build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android_arm64-v8a.apk
