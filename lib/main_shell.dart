@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui'; 
+import 'dart:async'; 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -28,48 +29,97 @@ import 'manage_students_screen.dart';
 import 'manage_users_screen.dart';
 import 'banned_ips_screen.dart';
 import 'traffic_monitor_screen.dart';
+import 'news_screen.dart';
+
+import 'exam_lookup_screen.dart';
+import 'manage_exams_screen.dart';
+import 'grammar_check_screen.dart';
+import 'manage_violations_screen.dart';
 
 import 'human_chat_list_screen.dart';
 import 'ai_consulting_screen.dart';
-import 'holland_test_screen.dart';
-
-// THÊM DÒNG NÀY ĐỂ LẤY BIẾN currentAppVersion TỪ main.dart
+import 'consulting_test_screen.dart'; 
 import 'main.dart'; 
+import 'config.dart';
 
 const List<FontFeature> _interFeatures = [
-  FontFeature.enable('cv05'),
-  FontFeature.enable('cv08'),
-  FontFeature.enable('ss01'),
+  FontFeature.enable('cv05'), FontFeature.enable('cv08'), FontFeature.enable('ss01'),
 ];
 const double _interSpacing = -0.15; 
 
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.reload(); 
-  final String? notiStr = prefs.getString('local_notifications');
-  List<Map<String, dynamic>> notifs = [];
-  if (notiStr != null) {
-    try { notifs = List<Map<String, dynamic>>.from(jsonDecode(notiStr)); } catch (e) {}
+// ==============================================================
+// WIDGET MARQUEE (TỰ ĐỘNG CHẠY CHỮ) CHO TICKER
+// ==============================================================
+class MarqueeWidget extends StatefulWidget {
+  final String text;
+  const MarqueeWidget({super.key, required this.text});
+
+  @override
+  State<MarqueeWidget> createState() => _MarqueeWidgetState();
+}
+
+class _MarqueeWidgetState extends State<MarqueeWidget> {
+  late ScrollController _scrollController;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
   }
 
-  String title = message.notification?.title ?? message.data['title'] ?? 'Thông báo hệ thống';
-  String body = message.notification?.body ?? message.data['body'] ?? message.data['content'] ?? 'Bạn có thông báo mới.';
-  Map<String, String> safeData = {};
-  message.data.forEach((k, v) => safeData[k.toString()] = v.toString());
-  
-  String notiId = message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString();
-
-  if (!notifs.any((n) => n['id'] == notiId)) {
-    notifs.insert(0, {
-      'id': notiId,
-      'title': title, 'body': body, 'isRead': false, 
-      'time': DateTime.now().toIso8601String(), 'data': safeData,
+  void _startScrolling() {
+    // Chạy vòng lặp đẩy ScrollView nhích sang phải liên tục
+    _timer = Timer.periodic(const Duration(milliseconds: 25), (timer) {
+      if (_scrollController.hasClients) {
+        double maxScroll = _scrollController.position.maxScrollExtent;
+        double currentScroll = _scrollController.offset;
+        if (currentScroll >= maxScroll) {
+          _scrollController.jumpTo(0.0); // Reset về đầu
+        } else {
+          _scrollController.jumpTo(currentScroll + 1.0); // Tốc độ trôi
+        }
+      }
     });
-    await prefs.setString('local_notifications', jsonEncode(notifs));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(), // Khóa không cho kéo tay
+      child: Row(
+        children: [
+          SizedBox(width: MediaQuery.of(context).size.width), // Khoảng trống xuất phát
+          Text(
+            widget.text, 
+            style: TextStyle(
+              fontWeight: FontWeight.w600, 
+              fontSize: 13, 
+              letterSpacing: 0.5,
+              color: isDark ? Colors.blue.shade300 : Colors.blue.shade800
+            )
+          ),
+          SizedBox(width: MediaQuery.of(context).size.width), // Khoảng trống chờ lặp lại
+        ],
+      ),
+    );
   }
 }
 
+// ==============================================================
+// MAIN SHELL CLASS
+// ==============================================================
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -77,23 +127,74 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
+
+  Future<void> _requestNotificationPermission() async {
+    if (Platform.isAndroid) {
+      final status = await Permission.notification.status;
+      if (!status.isGranted) await Permission.notification.request();
+    }
+  }
+  
   int _currentIndex = 0;
   String _userName = 'Đang tải...';
   String _role = 'STUDENT';
-  String _avatar = 'https://qlnn.testifiyonline.xyz/static/default.png';
+  String _avatar = '${AppConfig.baseUrl}/static/default.png';
+  String _tickerText = ''; // BIẾN LƯU NỘI DUNG TICKER
 
   final ValueNotifier<List<Map<String, dynamic>>> _notificationsNotifier = ValueNotifier([]);
 
+  Timer? _notiTimer;
+  String _lastNotiStr = '';
+  final Set<String> _seenNotiIds = {};
+
   bool get _isStaff => ['TEACHER', 'ADMIN', 'RED_FLAG'].contains(_role);
+  bool get _isAdmin => _role == 'ADMIN';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _requestNotificationPermission();
     _loadUserData();
-    _loadNotifications();
+    _fetchTicker(); // GỌI API TẢI TICKER
+    _loadNotifications(isInit: true); 
     _setupGlobalFCMListeners();
     _checkUpdate(); 
+
+    _notiTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _loadNotifications(isInit: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notiTimer?.cancel(); 
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadNotifications(isInit: false, forceReload: true);
+      _fetchTicker(); // Nạp lại Ticker khi mở lại app
+    }
+  }
+
+  // LẤY DỮ LIỆU TICKER TỪ MÁY CHỦ
+  Future<void> _fetchTicker() async {
+    try {
+      final dio = Dio();
+      final response = await dio.get('${AppConfig.baseUrl}/api/get_ticker_api.php');
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        setState(() {
+          _tickerText = response.data['ticker'] ?? '';
+        });
+      }
+    } catch (e) {
+      debugPrint("Lỗi tải Ticker: $e");
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -101,7 +202,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _userName = prefs.getString('full_name') ?? 'Người dùng';
       _role = prefs.getString('role') ?? 'STUDENT';
-      _avatar = prefs.getString('avatar') ?? 'https://qlnn.testifiyonline.xyz/static/default.png';
+      _avatar = prefs.getString('avatar') ?? '${AppConfig.baseUrl}/static/default.png';
     });
   }
 
@@ -116,19 +217,13 @@ class _MainShellState extends State<MainShell> {
     try {
       final dio = Dio();
       final response = await dio.get(
-        'https://qlnn.testifiyonline.xyz/api/check_update.php',
-        // Biến currentAppVersion giờ được lấy tự động từ main.dart
+        '${AppConfig.baseUrl}/api/check_update.php',
         queryParameters: {'version': currentAppVersion, 'abi': primaryAbi}
       );
       
       if (response.statusCode == 200 && response.data['update_available'] == true) {
         final data = response.data;
-        final String newVersion = data['version'].toString();
-        final String downloadUrl = data['download_url'].toString();
-        final String changelog = data['note'] ?? 'Bản cập nhật tối ưu hóa hệ thống.';
-        final bool isForceUpdate = data['is_force_update'] == true;
-        
-        if (mounted) _showUpdateDialog(newVersion, changelog, downloadUrl, isForceUpdate);
+        if (mounted) _showUpdateDialog(data['version'].toString(), data['note'] ?? 'Bản cập nhật tối ưu hóa', data['download_url'].toString(), data['is_force_update'] == true);
       }
     } catch (e) {}
   }
@@ -149,9 +244,8 @@ class _MainShellState extends State<MainShell> {
                 content: Column(
                   mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isForceUpdate) 
-                      const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Ứng dụng đã quá cũ và không còn được hỗ trợ. Bắt buộc phải cập nhật để tiếp tục sử dụng!', style: TextStyle(fontFamily: 'Inter', color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))),
-                    const Text('Có phiên bản mới với các thay đổi:', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blueGrey)), const SizedBox(height: 8),
+                    if (isForceUpdate) const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Bắt buộc phải cập nhật để tiếp tục sử dụng!', style: TextStyle(fontFamily: 'Inter', color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))),
+                    const Text('Thay đổi:', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blueGrey)), const SizedBox(height: 8),
                     Container(width: double.infinity, constraints: const BoxConstraints(maxHeight: 150), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)), child: SingleChildScrollView(child: Text(changelog, style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)))),
                     if (isDownloading) ...[const SizedBox(height: 20), LinearProgressIndicator(value: progress, backgroundColor: Colors.grey.shade300, color: Colors.blue, minHeight: 8, borderRadius: BorderRadius.circular(10)), const SizedBox(height: 8), Center(child: Text('Đang tải: ${(progress * 100).toStringAsFixed(1)}%', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blue)))]
                   ],
@@ -159,19 +253,18 @@ class _MainShellState extends State<MainShell> {
                 actions: [
                   if (!isDownloading && !isForceUpdate) 
                     TextButton(onPressed: () => Navigator.pop(context), child: const Text('Để sau', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey))),
-                  
                   FilledButton.icon(
                     onPressed: isDownloading ? null : () async {
                       await Permission.requestInstallPackages.request();
                       setPopupState(() { isDownloading = true; progress = 0.0; });
                       try {
-                        Directory tempDir = await getTemporaryDirectory(); String savePath = "${tempDir.path}/LG3_Update_v$newVersion.apk";
+                        Directory tempDir = await getTemporaryDirectory(); String savePath = "${tempDir.path}/LG3_v$newVersion.apk";
                         await Dio().download(downloadUrl, savePath, onReceiveProgress: (rcv, total) { if (total != -1) setPopupState(() { progress = rcv / total; }); });
                         if (!isForceUpdate && context.mounted) Navigator.pop(context); 
                         await OpenFilex.open(savePath);
                         if (isForceUpdate) setPopupState(() { isDownloading = false; progress = 1.0; });
                       } catch (e) {
-                        setPopupState(() { isDownloading = false; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lỗi khi tải bản cập nhật!', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing))));
+                        setPopupState(() { isDownloading = false; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lỗi tải bản cập nhật!')));
                       }
                     },
                     icon: isDownloading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.download, size: 18), label: Text(isDownloading ? 'Đang tải...' : 'Cập nhật ngay', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)),
@@ -185,48 +278,51 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  // ... (TẤT CẢ CÁC HÀM TỪ _loadNotifications TRỞ ĐI GIỮ NGUYÊN BẢN CŨ CỦA SẾP NHA) ...
-
-  Future<void> _loadNotifications() async {
-    final prefs = await SharedPreferences.getInstance(); await prefs.reload(); 
+  Future<void> _loadNotifications({bool isInit = false, bool forceReload = false}) async {
+    final prefs = await SharedPreferences.getInstance(); 
+    if (isInit || forceReload) await prefs.reload();
     final String? notiStr = prefs.getString('local_notifications');
-    if (notiStr != null) { try { _notificationsNotifier.value = List<Map<String, dynamic>>.from(jsonDecode(notiStr)); } catch (e) {} }
+    final bool isNotiEnabled = prefs.getBool('push_enabled') ?? true;
+
+    if (notiStr != null && notiStr != _lastNotiStr) { 
+      _lastNotiStr = notiStr;
+      try { 
+        List<dynamic> raw = jsonDecode(notiStr); 
+        final newList = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _notificationsNotifier.value = newList;
+        
+        int delayMs = 0;
+        for (var n in newList) {
+          String nid = n['id'].toString();
+          if (!_seenNotiIds.contains(nid)) {
+            _seenNotiIds.add(nid);
+            if (!isInit && isNotiEnabled && !forceReload) {
+              final dt = DateTime.parse(n['time']);
+              if (DateTime.now().difference(dt).inSeconds < 60) {
+                Future.delayed(Duration(milliseconds: delayMs), () {
+                  if (mounted) _showInAppNotification(n['title'], n['body'], nid, n['data'] ?? {});
+                });
+                delayMs += 800; 
+              }
+            }
+          }
+        }
+      } catch (e) {} 
+    }
   }
 
   Future<void> _saveNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('local_notifications', jsonEncode(_notificationsNotifier.value));
+    String str = jsonEncode(_notificationsNotifier.value);
+    _lastNotiStr = str; 
+    await prefs.setString('local_notifications', str);
   }
 
   Future<void> _setupGlobalFCMListeners() async {
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
-
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      await _saveIncomingMessage(message, isRead: false);
-      String title = message.notification?.title ?? message.data['title'] ?? 'Thông báo mới';
-      String body = message.notification?.body ?? message.data['body'] ?? message.data['content'] ?? '';
-      Map<String, String> safeData = {}; message.data.forEach((k, v) => safeData[k.toString()] = v.toString());
-      _showInAppNotification(title, body, message.messageId ?? '', safeData);
-    });
-    
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) { _markAsReadAndHandleClick(message); });
-
     RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) { Future.delayed(const Duration(milliseconds: 500), () { _markAsReadAndHandleClick(initialMessage); }); }
-  }
-
-  Future<void> _saveIncomingMessage(RemoteMessage message, {required bool isRead}) async {
-    String title = message.notification?.title ?? message.data['title'] ?? 'Thông báo hệ thống';
-    String body = message.notification?.body ?? message.data['body'] ?? message.data['content'] ?? 'Bạn có thông báo mới.';
-    Map<String, String> safeData = {}; message.data.forEach((k, v) => safeData[k.toString()] = v.toString());
-    String notiId = message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString();
-
-    final currentNotifs = List<Map<String, dynamic>>.from(_notificationsNotifier.value);
-    if (!currentNotifs.any((n) => n['id'] == notiId)) {
-      currentNotifs.insert(0, { 'id': notiId, 'title': title, 'body': body, 'isRead': isRead, 'time': DateTime.now().toIso8601String(), 'data': safeData, });
-      _notificationsNotifier.value = currentNotifs; await _saveNotifications();
-    }
   }
 
   void _markIdAsRead(String notiId) {
@@ -234,12 +330,16 @@ class _MainShellState extends State<MainShell> {
     List<Map<String, dynamic>> updatedList = List.from(_notificationsNotifier.value);
     int index = updatedList.indexWhere((n) => n['id'] == notiId);
     if (index != -1) {
-      updatedList[index]['isRead'] = true; _notificationsNotifier.value = updatedList; _saveNotifications();
+      updatedList[index]['isRead'] = true; 
+      _notificationsNotifier.value = updatedList; 
+      _saveNotifications();
     }
   }
 
   void _markAsReadAndHandleClick(RemoteMessage message) async {
-    await _loadNotifications(); await _saveIncomingMessage(message, isRead: true); _markIdAsRead(message.messageId ?? ''); _handleNotificationClick(message.data);
+    await _loadNotifications(isInit: false, forceReload: true); 
+    _markIdAsRead(message.messageId ?? ''); 
+    _handleNotificationClick(message.data);
   }
 
   void _showInAppNotification(String title, String body, String notiId, Map<String, dynamic> data) {
@@ -291,7 +391,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _showNotificationsPanel() {
-    _loadNotifications();
+    _loadNotifications(isInit: false);
     showModalBottomSheet(
       context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
       builder: (context) {
@@ -343,7 +443,7 @@ class _MainShellState extends State<MainShell> {
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: const Text('Xác nhận', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing))), TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Đăng xuất', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.red)))]));
     if (confirm != true) return;
-    try { final prefs = await SharedPreferences.getInstance(); await http.get(Uri.parse('https://qlnn.testifiyonline.xyz/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}); } catch (e) {}
+    try { final prefs = await SharedPreferences.getInstance(); await http.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}); } catch (e) {}
     final prefs = await SharedPreferences.getInstance(); await prefs.clear();
     if (!mounted) return; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
@@ -386,11 +486,28 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(_getAppBarTitle(), style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w900, fontSize: 18)),
         centerTitle: true, elevation: 0, scrolledUnderElevation: 2,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              String currentLang = prefs.getString('lang') ?? 'vi';
+              String nextLang = currentLang == 'en' ? 'vi' : 'en';
+              await prefs.setString('lang', nextLang);
+              // Phải khởi động lại trang chính hoặc cập nhật trạng thái
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(nextLang == 'en' ? 'Switched to English' : 'Đã chuyển sang Tiếng Việt')));
+                setState(() {});
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell()));
+              }
+            },
+          ),
           ValueListenableBuilder<List<Map<String, dynamic>>>(
             valueListenable: _notificationsNotifier,
             builder: (context, notifs, child) {
@@ -419,10 +536,10 @@ class _MainShellState extends State<MainShell> {
         child: Column(
           children: [
             UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Theme.of(context).colorScheme.primary),
+              decoration: BoxDecoration(color: isDark ? Colors.grey[900] : Theme.of(context).colorScheme.primary),
               accountName: Text(_userName, style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
               accountEmail: Text('Quyền: $_role', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.white70)),
-              currentAccountPicture: CircleAvatar(backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Theme.of(context).colorScheme.surface, backgroundImage: NetworkImage(_avatar)),
+              currentAccountPicture: CircleAvatar(backgroundColor: isDark ? Colors.grey[800] : Theme.of(context).colorScheme.surface, backgroundImage: NetworkImage(_avatar)),
             ),
             
             Expanded(
@@ -433,11 +550,15 @@ class _MainShellState extends State<MainShell> {
                   ListTile(leading: const Icon(Icons.lock_reset, color: Colors.blueGrey), title: const Text('Đổi mật khẩu', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())); }),
                   ListTile(leading: const Icon(Icons.workspace_premium, color: Colors.amber), title: const Text('Bảng xếp hạng thi đua', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const RankingScreen())); }),
                   ListTile(leading: const Icon(Icons.settings, color: Colors.grey), title: const Text('Cài đặt App', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())); }),
+                  ListTile(leading: const Icon(Icons.newspaper, color: Colors.blue), title: const Text('Tin tức & Thông báo', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const NewsScreen())); }),
+                  
+                  ListTile(leading: const Icon(Icons.scoreboard, color: Colors.amber), title: const Text('Tra cứu Điểm thi', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamLookupScreen())); }),
+                  ListTile(leading: const Icon(Icons.spellcheck, color: Colors.green), title: const Text('Trợ lý Grammar AI', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const GrammarCheckScreen())); }),
 
                   const Divider(),
-                  const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('TƯ VẤN TÂM LÝ', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                  const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('TƯ VẤN TÂM LÝ & HƯỚNG NGHIỆP', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
                   
-                  ListTile(leading: const Icon(Icons.explore, color: Colors.green), title: const Text('Trắc nghiệm Holland', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const HollandTestScreen())); }),
+                  ListTile(leading: const Icon(Icons.explore, color: Colors.green), title: const Text('Đánh giá Nghề nghiệp', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsultingTestScreen())); }),
                   ListTile(leading: const Icon(Icons.forum, color: Colors.blue), title: const Text('Tư vấn trực tiếp', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const HumanChatListScreen())); }),
                   ListTile(leading: const Icon(Icons.psychology, color: Colors.purple), title: const Text('Chuyên gia AI', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const AiConsultingScreen())); }),
 
@@ -446,15 +567,17 @@ class _MainShellState extends State<MainShell> {
 
                   if (_isStaff) ...[
                     const Divider(),
-                    const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('CÔNG TÁC NỀN NẾP', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                    const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('CÔNG TÁC NỀN NẾP & HỌC TẬP', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
                     
+                    ListTile(leading: const Icon(Icons.gavel, color: Colors.red), title: const Text('Quản lý Vi phạm', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageViolationsScreen())); }),
+                    ListTile(leading: const Icon(Icons.task, color: Colors.pink), title: const Text('Quản lý Kỳ thi', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageExamsScreen())); }),
                     ListTile(leading: const Icon(Icons.history, color: Colors.purple), title: const Text('Lịch sử vi phạm', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen())); }),
                     ListTile(leading: const Icon(Icons.edit_note, color: Colors.teal), title: const Text('Nhập điểm học tập', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const InputAcademicScreen())); }),
                     ListTile(leading: const Icon(Icons.file_download, color: Colors.green), title: const Text('Xuất báo cáo Excel', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportReportScreen())); }),
                     ListTile(leading: const Icon(Icons.co_present, color: Colors.deepOrange), title: const Text('Lớp của tôi', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen())); }),
                   ],
 
-                  if (_role == 'ADMIN') ...[
+                  if (_isAdmin) ...[
                     const Divider(),
                     const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('HỆ THỐNG', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
                     
@@ -474,12 +597,27 @@ class _MainShellState extends State<MainShell> {
         ),
       ),
       
-      body: _buildBody(),
+      // BỌC _buildBody() BẰNG KHỐI TICKER Ở TRÊN CÙNG
+      body: Column(
+        children: [
+          if (_tickerText.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.withOpacity(0.05),
+                border: Border(bottom: BorderSide(color: Colors.blue.withOpacity(0.1))),
+              ),
+              child: MarqueeWidget(text: _tickerText),
+            ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
       
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarTheme.of(context).copyWith(
-          labelTextStyle: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary);
             }
             return const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey);

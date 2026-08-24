@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class TrafficMonitorScreen extends StatefulWidget {
   const TrafficMonitorScreen({super.key});
@@ -23,7 +24,7 @@ class _TrafficMonitorScreenState extends State<TrafficMonitorScreen> {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     try {
-      final res = await http.get(Uri.parse('https://qlnn.testifiyonline.xyz/api/traffic_monitor_api?range=$_range'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/traffic_monitor_api?range=$_range'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
       final data = jsonDecode(res.body);
       if (data['status'] == 'success') {
         setState(() { _overview = data['overview']; _stats = data['stats']; _isLoading = false; });

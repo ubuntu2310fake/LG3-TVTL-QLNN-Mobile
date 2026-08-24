@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'edit_student_screen.dart';
+import 'config.dart';
 
 class ManageStudentsScreen extends StatefulWidget {
   const ManageStudentsScreen({super.key});
@@ -28,7 +29,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
     final prefs = await SharedPreferences.getInstance();
     
     final res = await http.get(
-      Uri.parse('https://qlnn.testifiyonline.xyz/api/manage_students_api?search=$_search&class_id=$_classId&page=$_currentPage'), 
+      Uri.parse('${AppConfig.baseUrl}/api/manage_students_api?search=$_search&class_id=$_classId&page=$_currentPage'), 
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}
     );
     
@@ -48,7 +49,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
   Future<void> _quickApprove(String code) async {
     final prefs = await SharedPreferences.getInstance();
     await http.post(
-      Uri.parse('https://qlnn.testifiyonline.xyz/api/manage_students_api'), 
+      Uri.parse('${AppConfig.baseUrl}/api/manage_students_api'), 
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, 
       body: jsonEncode({'action': 'quick_approve', 'code': code})
     );
@@ -89,7 +90,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                 bool hasPending = s['has_pending_changes'] == 1;
                 return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(
                   leading: CircleAvatar(
-                    backgroundImage: s['image_url'] != null ? NetworkImage('https://qlnn.testifiyonline.xyz/${s['image_url']}') : null,
+                    backgroundImage: s['image_url'] != null ? NetworkImage('${AppConfig.baseUrl}/${s['image_url']}') : null,
                     child: s['image_url'] == null ? const Icon(Icons.person) : null,
                   ),
                   title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),

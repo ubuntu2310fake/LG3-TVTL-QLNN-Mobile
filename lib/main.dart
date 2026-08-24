@@ -1,26 +1,117 @@
 import 'dart:convert';
-import 'dart:ui'; // BẮT BUỘC ĐỂ DÙNG FontFeature
+import 'dart:ui';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; 
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:workmanager/workmanager.dart';
+import 'offline_queue_service.dart';
 
 import 'login_screen.dart';
 import 'main_shell.dart';
+import 'config.dart';
 
-// ==========================================
-// KHAI BÁO BIẾN TOÀN CỤC (Chỉ sửa ở đây)
-// ==========================================
-const String currentAppVersion = "1.0.4_r1";
-
-// BIẾN TOÀN CỤC ĐỂ ĐIỀU KHIỂN THEME TOÀN APP
+const String currentAppVersion = "2.0.0";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+
+bool _isProcessingNoti = false;
+List<RemoteMessage> _notiQueue = [];
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  _notiQueue.add(message);
+  if (_isProcessingNoti) return; 
+  _isProcessingNoti = true;
+
+  try { await Firebase.initializeApp(); } catch (e) {}
+  
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  
+  // FIX: Sửa 'ic_launcher' thành 'launcher_icon' để gọi đúng logo của trường LG3
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/launcher_icon');
+  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'lg3_main_channel', 'Thông báo chung',
+    importance: Importance.max, 
+    priority: Priority.high, 
+    icon: '@mipmap/launcher_icon', // FIX Ở ĐÂY
+  );
+  const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidDetails);
+
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload(); 
+
+  final String? notiStr = prefs.getString('local_notifications');
+  List<Map<String, dynamic>> notifs = [];
+  if (notiStr != null) {
+    try { 
+      List<dynamic> raw = jsonDecode(notiStr);
+      notifs = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {}
+  }
+
+  while (_notiQueue.isNotEmpty) {
+    final msg = _notiQueue.removeAt(0);
+
+    String title = msg.notification?.title ?? msg.data['title'] ?? 'Thông báo hệ thống';
+    String body = msg.notification?.body ?? msg.data['body'] ?? msg.data['content'] ?? 'Bạn có thông báo mới.';
+    Map<String, String> safeData = {};
+    msg.data.forEach((k, v) => safeData[k.toString()] = v.toString());
+    
+    String notiId = msg.messageId ?? Random().nextInt(99999999).toString();
+
+    if (!notifs.any((n) => n['id'] == notiId)) {
+      notifs.insert(0, {
+        'id': notiId,
+        'title': title, 'body': body, 'isRead': false, 
+        'time': DateTime.now().toIso8601String(), 'data': safeData,
+      });
+    }
+
+    int pushId = Random().nextInt(2147483647);
+    await flutterLocalNotificationsPlugin.show(pushId, title, body, platformChannelSpecifics);
+  }
+  
+  if (notifs.length > 50) notifs = notifs.sublist(0, 50);
+  
+  await prefs.setString('local_notifications', jsonEncode(notifs)); 
+
+  _isProcessingNoti = false;
+}
+
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (task == "syncOfflineQueue") { await OfflineQueueService.processQueue(); }
+    return Future.value(true);
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // Load cấu hình Theme đã lưu từ trước
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    firebaseMessagingBackgroundHandler(message);
+  });
+
+  try { await FlutterDisplayMode.setHighRefreshRate(); } catch (e) { }
+  
+  Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+  Workmanager().registerPeriodicTask(
+    "1", "syncOfflineQueue", 
+    frequency: const Duration(minutes: 15), constraints: Constraints(networkType: NetworkType.connected),
+  );
+
   final prefs = await SharedPreferences.getInstance();
   final savedTheme = prefs.getString('theme_mode') ?? 'system';
   if (savedTheme == 'light') themeNotifier.value = ThemeMode.light;
@@ -30,38 +121,20 @@ void main() async {
   runApp(const LG3App());
 }
 
-// HÀM ÁP DỤNG FONT INTER KÈM CÁC CẤU HÌNH NÂNG CAO CHO TOÀN BỘ APP (GIỐNG WEB)
 TextTheme buildInterTextTheme(TextTheme base) {
   return base.copyWith(
-    // Áp dụng cho mọi kiểu chữ từ nhỏ đến lớn
-    displayLarge: _applyInter(base.displayLarge),
-    displayMedium: _applyInter(base.displayMedium),
-    displaySmall: _applyInter(base.displaySmall),
-    headlineLarge: _applyInter(base.headlineLarge),
-    headlineMedium: _applyInter(base.headlineMedium),
-    headlineSmall: _applyInter(base.headlineSmall),
-    titleLarge: _applyInter(base.titleLarge),
-    titleMedium: _applyInter(base.titleMedium),
-    titleSmall: _applyInter(base.titleSmall),
-    bodyLarge: _applyInter(base.bodyLarge),
-    bodyMedium: _applyInter(base.bodyMedium),
-    bodySmall: _applyInter(base.bodySmall),
-    labelLarge: _applyInter(base.labelLarge),
-    labelMedium: _applyInter(base.labelMedium),
-    labelSmall: _applyInter(base.labelSmall),
+    displayLarge: _applyInter(base.displayLarge), displayMedium: _applyInter(base.displayMedium), displaySmall: _applyInter(base.displaySmall),
+    headlineLarge: _applyInter(base.headlineLarge), headlineMedium: _applyInter(base.headlineMedium), headlineSmall: _applyInter(base.headlineSmall),
+    titleLarge: _applyInter(base.titleLarge), titleMedium: _applyInter(base.titleMedium), titleSmall: _applyInter(base.titleSmall),
+    bodyLarge: _applyInter(base.bodyLarge), bodyMedium: _applyInter(base.bodyMedium), bodySmall: _applyInter(base.bodySmall),
+    labelLarge: _applyInter(base.labelLarge), labelMedium: _applyInter(base.labelMedium), labelSmall: _applyInter(base.labelSmall),
   );
 }
 
-// Hàm bổ trợ để ép cấu hình chuẩn Web CSS
 TextStyle _applyInter(TextStyle? style) {
   return (style ?? const TextStyle()).copyWith(
-    fontFamily: 'Inter',
-    letterSpacing: -0.15, // Tương đương -0.011em
-    fontFeatures: [
-      const FontFeature.enable('cv05'), // Lowercase 'l' with tail
-      const FontFeature.enable('cv08'), // Upper case 'I' with serifs
-      const FontFeature.enable('ss01'), // Open digits (ví dụ số 1, 6, 9 thoáng hơn)
-    ],
+    fontFamily: 'Inter', letterSpacing: -0.15,
+    fontFeatures: [ const FontFeature.enable('cv05'), const FontFeature.enable('cv08'), const FontFeature.enable('ss01') ],
   );
 }
 
@@ -78,14 +151,14 @@ class LG3App extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           themeMode: currentMode,
           theme: ThemeData(
-            fontFamily: 'Inter', // Cấu hình Font mặc định
-            textTheme: buildInterTextTheme(ThemeData.light().textTheme), // Áp dụng chi tiết FontFeature
+            fontFamily: 'Inter', 
+            textTheme: buildInterTextTheme(ThemeData.light().textTheme),
             colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF005FBA), brightness: Brightness.light),
             useMaterial3: true,
           ),
           darkTheme: ThemeData(
-            fontFamily: 'Inter', // Cấu hình Font mặc định
-            textTheme: buildInterTextTheme(ThemeData.dark().textTheme), // Áp dụng chi tiết FontFeature
+            fontFamily: 'Inter',
+            textTheme: buildInterTextTheme(ThemeData.dark().textTheme),
             colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF005FBA), brightness: Brightness.dark),
             useMaterial3: true,
           ),
@@ -104,45 +177,29 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   @override
-  void initState() {
-    super.initState();
-    _checkAutoLogin();
-  }
+  void initState() { super.initState(); _checkAutoLogin(); }
 
   Future<void> _checkAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final rememberToken = prefs.getString('remember_token');
 
-    // NẾU CÓ THẺ "NHỚ ĐĂNG NHẬP" -> GỌI API LẤY SESSION MỚI
     if (rememberToken != null && rememberToken.isNotEmpty) {
       try {
-        final response = await http.post(
-          Uri.parse('https://qlnn.testifiyonline.xyz/api/login_api'),
-          body: {'remember_token': rememberToken},
-        );
+        final response = await http.post(Uri.parse('${AppConfig.baseUrl}/api/login_api'), body: {'remember_token': rememberToken});
         final data = jsonDecode(response.body);
-        
         if (response.statusCode == 200 && data['status'] == 'success') {
           await prefs.setString('phpsessid', data['session_id']);
-          if (!mounted) return;
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell()));
-          return;
+          if (!mounted) return; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell())); return;
         }
       } catch (e) {
-        // LỖI MẠNG: Vẫn cho vào App để dùng Data Offline!
         final oldSess = prefs.getString('phpsessid');
         if (oldSess != null && oldSess.isNotEmpty) {
-          if (!mounted) return;
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell()));
-          return;
+          if (!mounted) return; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell())); return;
         }
       }
     }
-    
-    // NẾU KHÔNG CÓ TOKEN HOẶC BỊ TỪ CHỐI -> ĐÁ RA LOGIN
     await Future.delayed(const Duration(milliseconds: 500)); 
-    if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    if (!mounted) return; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
@@ -153,33 +210,9 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20), 
-              child: Image.asset(
-                'assets/images/lg3512512.png',
-                width: 100, 
-                height: 100,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.shield_rounded, size: 80, color: Colors.white),
-              ),
-            ),
+            ClipRRect(borderRadius: BorderRadius.circular(20), child: Image.asset('assets/images/lg3512512.png', width: 100, height: 100, errorBuilder: (context, error, stackTrace) => const Icon(Icons.shield_rounded, size: 80, color: Colors.white))),
             const SizedBox(height: 20),
-            
-            // ĐÃ SỬA: Căn giữa dòng chữ, ép xuống dòng cho đẹp
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24.0),
-              child: Text(
-                'LG3 - TƯ VẤN TÂM LÝ\nVÀ QUẢN LÝ THI ĐUA', 
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white, 
-                  fontSize: 22, 
-                  fontWeight: FontWeight.bold, 
-                  letterSpacing: 1.5,
-                  height: 1.4 // Tạo khoảng cách giữa 2 dòng
-                )
-              ),
-            ),
-            
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 24.0), child: Text('LG3 - TƯ VẤN TÂM LÝ\nVÀ QUẢN LÝ THI ĐUA', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1.5, height: 1.4))),
             const SizedBox(height: 40),
             CircularProgressIndicator(color: Colors.white.withOpacity(0.8)),
           ],

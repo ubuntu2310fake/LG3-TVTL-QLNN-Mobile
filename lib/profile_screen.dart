@@ -7,6 +7,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart'; 
 import 'device_helper.dart'; 
+import 'config.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -38,7 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // ĐÃ BỎ ĐUÔI .php
       final response = await http.get(
-        Uri.parse('https://qlnn.testifiyonline.xyz/api/profile_api'),
+        Uri.parse('${AppConfig.baseUrl}/api/profile_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
       );
 
@@ -49,6 +50,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         
         final currentDeviceData = _devices.firstWhere((d) => d['session_id'] == _currentSession, orElse: () => null);
         _isThisDevicePushEnabled = (currentDeviceData != null && currentDeviceData['push_enabled'] == 1);
+
+        await prefs.setBool('push_enabled', _isThisDevicePushEnabled);
 
         setState(() {
           _userData = data['user'];
@@ -119,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final sessionId = prefs.getString('phpsessid') ?? '';
 
       // Đã sửa đường dẫn thành api/profile_api (KHÔNG ĐUÔI PHP)
-      var request = http.MultipartRequest('POST', Uri.parse('https://qlnn.testifiyonline.xyz/api/profile_api'));
+      var request = http.MultipartRequest('POST', Uri.parse('${AppConfig.baseUrl}/api/profile_api'));
       request.headers['Cookie'] = 'PHPSESSID=$sessionId';
       
       // SỬA LẠI THÀNH 'avatar' ĐỂ KHỚP VỚI PHP SERVER
@@ -134,7 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã đổi Avatar thành công!'), backgroundColor: Colors.green));
         setState(() { 
           String newUrl = data['new_avatar_url'] ?? 'static/default.png';
-          _userData!['avatar'] = "https://qlnn.testifiyonline.xyz/" + newUrl; 
+          _userData!['avatar'] = "${AppConfig.baseUrl}" + newUrl; 
         });
       } else { throw Exception(data['msg'] ?? "Lỗi upload"); }
     } catch (e) {
@@ -163,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       final res = await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/api/profile_api'),
+        Uri.parse('${AppConfig.baseUrl}/api/profile_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
         body: {'action': 'delete_avatar'},
       );
@@ -171,7 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (data['status'] == 'success') {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã xóa ảnh đại diện!'), backgroundColor: Colors.green));
-        setState(() { _userData!['avatar'] = "https://qlnn.testifiyonline.xyz/static/default.png"; });
+        setState(() { _userData!['avatar'] = "${AppConfig.baseUrl}/static/default.png"; });
       }
     } catch(e) {} finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
@@ -196,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final sessionId = prefs.getString('phpsessid') ?? '';
       
       final response = await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/api/profile_api'),
+        Uri.parse('${AppConfig.baseUrl}/api/profile_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
         body: {'action': 'delete_device', 'device_id': targetSessionId},
       );
@@ -218,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         String realModel = await DeviceHelper.getDeviceModel();
         if (fcmToken != null) {
           final response = await http.post(
-            Uri.parse('https://qlnn.testifiyonline.xyz/api/subscribe'),
+            Uri.parse('${AppConfig.baseUrl}/api/subscribe'),
             headers: {'Content-Type': 'application/json', 'Cookie': 'PHPSESSID=$sessionId'},
             body: jsonEncode({'endpoint': fcmToken, 'platform': 'app', 'device_model': realModel}),
           );
@@ -229,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       } else {
         await http.post(
-          Uri.parse('https://qlnn.testifiyonline.xyz/gate_check'),
+          Uri.parse('${AppConfig.baseUrl}/gate_check'),
           headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
           body: 'delete_id=0&only_push=1' 
         );

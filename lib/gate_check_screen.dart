@@ -4,6 +4,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'offline_sync.dart';
+import 'offline_queue_service.dart';
+import 'config.dart';
 
 class GateCheckScreen extends StatefulWidget {
   const GateCheckScreen({super.key});
@@ -21,7 +23,6 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
   bool _isScanning = false;
   bool _isLoading = false;
   
-  // Biến cho tính năng Chấm Bù
   bool _isCustomTime = false;
   DateTime? _customDateTime;
 
@@ -31,12 +32,10 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
   List<Map<String, dynamic>> _violations = [];
   List<dynamic> _searchResults = [];
   
-  // BIẾN CHO CHỨC NĂNG CHỌN LỚP
   List<String> _classes = [];
   String? _selectedClassFilter;
   List<dynamic> _classStudents = [];
   
-  // Lưu lịch sử vừa chấm
   List<Map<String, dynamic>> _historyList = [];
 
   @override
@@ -49,47 +48,32 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
     final data = await OfflineSyncService.getMasterData();
     if (!mounted) return;
     setState(() {
-      if (data['current_week'] != null) {
-        _weekCtrl.text = data['current_week'].toString();
-      }
+      if (data['current_week'] != null) _weekCtrl.text = data['current_week'].toString();
       _offlineStudents = data['students'] ?? [];
       
-      // Trích xuất danh sách lớp tự động và SẮP XẾP THEO HỆ SỐ TỰ NHIÊN
       Set<String> classNames = {};
       for (var s in _offlineStudents) {
-        if (s['class_name'] != null) {
-          classNames.add(s['class_name'].toString());
-        }
+        if (s['class_name'] != null) classNames.add(s['class_name'].toString());
       }
       
-      // THUẬT TOÁN NATURAL SORT (10A2 đứng trước 10A10)
       _classes = classNames.toList()..sort((a, b) {
         final RegExp regExp = RegExp(r'(\d+)|([^\d]+)');
         final matchesA = regExp.allMatches(a).map((m) => m.group(0)!).toList();
         final matchesB = regExp.allMatches(b).map((m) => m.group(0)!).toList();
-
         for (int i = 0; i < matchesA.length && i < matchesB.length; i++) {
-          final partA = matchesA[i];
-          final partB = matchesB[i];
-
-          final numA = int.tryParse(partA);
-          final numB = int.tryParse(partB);
-
+          final partA = matchesA[i]; final partB = matchesB[i];
+          final numA = int.tryParse(partA); final numB = int.tryParse(partB);
           if (numA != null && numB != null) {
-            final cmp = numA.compareTo(numB);
-            if (cmp != 0) return cmp;
+            final cmp = numA.compareTo(numB); if (cmp != 0) return cmp;
           } else {
-            final cmp = partA.compareTo(partB);
-            if (cmp != 0) return cmp;
+            final cmp = partA.compareTo(partB); if (cmp != 0) return cmp;
           }
         }
         return matchesA.length.compareTo(matchesB.length);
       });
 
       if (data['gate_violations'] != null) {
-        _violations = List<Map<String, dynamic>>.from(data['gate_violations'].map((v) => {
-          'id': v['id'], 'name': v['name'], 'points': v['points']
-        }));
+        _violations = List<Map<String, dynamic>>.from(data['gate_violations'].map((v) => { 'id': v['id'], 'name': v['name'], 'points': v['points'] }));
       }
     });
   }
@@ -108,10 +92,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
     if (query.isEmpty) { setState(() => _searchResults = []); return; }
     final q = query.toLowerCase();
     setState(() {
-      _searchResults = _offlineStudents.where((s) {
-        return s['name'].toString().toLowerCase().contains(q) || s['code'].toString().toLowerCase().contains(q);
-      }).toList();
-      
+      _searchResults = _offlineStudents.where((s) => s['name'].toString().toLowerCase().contains(q) || s['code'].toString().toLowerCase().contains(q)).toList();
       _selectedClassFilter = null;
       _classStudents = [];
     });
@@ -123,9 +104,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
     if (!mounted) return;
     final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
     if (time == null) return;
-    setState(() {
-      _customDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    });
+    setState(() => _customDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
 
   Future<void> _submitViolation() async {
@@ -135,27 +114,16 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
+      var request = http.Request('POST', Uri.parse('${AppConfig.baseUrl}/gate_check'));
+      request.headers['Cookie'] = 'PHPSESSID=$sessionId'; request.headers['Content-Type'] = 'application/x-www-form-urlencoded';
 
-      var request = http.Request('POST', Uri.parse('https://qlnn.testifiyonline.xyz/gate_check'));
-      request.headers['Cookie'] = 'PHPSESSID=$sessionId';
-      request.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-
-      List<String> bodyParts = [
-        'student_id=${_selectedStudent!['id']}',
-        'week=${_weekCtrl.text}',
-        'other_note=${Uri.encodeQueryComponent(_noteCtrl.text)}',
-      ];
-
+      List<String> bodyParts = ['student_id=${_selectedStudent!['id']}', 'week=${_weekCtrl.text}', 'other_note=${Uri.encodeQueryComponent(_noteCtrl.text)}'];
       if (_isCustomTime && _customDateTime != null) {
         String f(int n) => n.toString().padLeft(2, '0');
         String timeStr = '${_customDateTime!.year}-${f(_customDateTime!.month)}-${f(_customDateTime!.day)} ${f(_customDateTime!.hour)}:${f(_customDateTime!.minute)}:00';
         bodyParts.add('custom_time=${Uri.encodeQueryComponent(timeStr)}');
       }
-
-      for (var vid in _selectedViolations) { 
-        bodyParts.add('violation_ids[]=$vid'); 
-      }
-      
+      for (var vid in _selectedViolations) { bodyParts.add('violation_ids[]=$vid'); }
       request.body = bodyParts.join('&');
 
       var response = await http.Client().send(request);
@@ -166,15 +134,28 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã lưu thành công!'), backgroundColor: Colors.green));
         setState(() {
-          if (data['new_data'] != null) {
-            _historyList.insertAll(0, List<Map<String, dynamic>>.from(data['new_data']));
-          }
-          _selectedStudent = null; _selectedViolations.clear(); _noteCtrl.clear();
-          _selectedClassFilter = null; _classStudents.clear();
+          if (data['new_data'] != null) _historyList.insertAll(0, List<Map<String, dynamic>>.from(data['new_data']));
+          _selectedStudent = null; _selectedViolations.clear(); _noteCtrl.clear(); _selectedClassFilter = null; _classStudents.clear();
         });
       } else { throw Exception(data['msg'] ?? "Lỗi server"); }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Lỗi kết nối!'), backgroundColor: Colors.red));
+      List<String> bodyParts = ['student_id=${_selectedStudent!['id']}', 'week=${_weekCtrl.text}', 'other_note=${Uri.encodeQueryComponent(_noteCtrl.text)}'];
+      if (_isCustomTime && _customDateTime != null) {
+        String f(int n) => n.toString().padLeft(2, '0');
+        String timeStr = '${_customDateTime!.year}-${f(_customDateTime!.month)}-${f(_customDateTime!.day)} ${f(_customDateTime!.hour)}:${f(_customDateTime!.minute)}:00';
+        bodyParts.add('custom_time=${Uri.encodeQueryComponent(timeStr)}');
+      }
+      for (var vid in _selectedViolations) { bodyParts.add('violation_ids[]=$vid'); }
+
+      await OfflineQueueService.enqueue(
+        url: '${AppConfig.baseUrl}/gate_check', method: 'POST', contentType: 'application/x-www-form-urlencoded', body: bodyParts.join('&'),
+        title: 'Trực cổng: ${_selectedStudent!['name']} - Lớp ${_selectedStudent!['class_name']}',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Mất mạng! Đã lưu Offline ngầm.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: Colors.orange));
+        setState(() { _selectedStudent = null; _selectedViolations.clear(); _noteCtrl.clear(); _selectedClassFilter = null; _classStudents.clear(); });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -182,8 +163,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
 
   Future<void> _deleteRecord(dynamic id) async {
     final confirm = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
+      context: context, builder: (c) => AlertDialog(
         title: const Text('Xác nhận'), content: const Text('Xóa lỗi vi phạm này?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
@@ -197,7 +177,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       final response = await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/gate_check'),
+        Uri.parse('${AppConfig.baseUrl}/gate_check'),
         headers: { 'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'delete_id=$id'
       );
@@ -207,6 +187,40 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa lỗi!')));
       }
     } catch (e) {}
+  }
+
+  // ==========================================
+  // HÀM TẠO AVATAR CHỐNG LỖI MẠNG
+  // ==========================================
+  Widget _buildAvatar(dynamic studentData, double radius) {
+    String? imgUrl = studentData['image_url'];
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final fallbackBg = isDark ? Colors.grey[800] : Colors.grey[200];
+    final fallbackIconColor = isDark ? Colors.grey[400] : Colors.grey;
+
+    if (imgUrl != null && imgUrl.isNotEmpty && imgUrl != 'null') {
+      // Ép tên miền vào nếu db chỉ lưu đường dẫn ảo
+      String fullUrl = imgUrl.startsWith('http') ? imgUrl : '${AppConfig.baseUrl}/$imgUrl';
+      
+      return ClipOval(
+        child: Image.network(
+          fullUrl,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => CircleAvatar(
+            radius: radius, backgroundColor: fallbackBg,
+            child: Icon(Icons.person, color: fallbackIconColor, size: radius),
+          ),
+        ),
+      );
+    }
+    
+    // Nếu không có link ảnh
+    return CircleAvatar(
+      radius: radius, backgroundColor: fallbackBg,
+      child: Icon(Icons.person, color: fallbackIconColor, size: radius),
+    );
   }
 
   @override
@@ -278,7 +292,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                   return ListTile(
                     title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('Lớp: ${s['class_name']} - Mã: ${s['code']}'),
-                    leading: CircleAvatar(backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200], child: const Icon(Icons.person, color: Colors.grey)),
+                    leading: _buildAvatar(s, 20), // DÙNG AVATAR CHUẨN MỚI
                     onTap: () { setState(() { _selectedStudent = s; _searchResults = []; _searchCtrl.clear(); }); },
                   );
                 }
@@ -328,19 +342,13 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(top: 15),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 2.5, crossAxisSpacing: 10, mainAxisSpacing: 10
+                  crossAxisCount: 2, childAspectRatio: 2.2, crossAxisSpacing: 10, mainAxisSpacing: 10
                 ),
                 itemCount: _classStudents.length,
                 itemBuilder: (context, index) {
                   final s = _classStudents[index];
                   return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedStudent = s;
-                        _classStudents = []; 
-                        _selectedClassFilter = null; 
-                      });
-                    },
+                    onTap: () { setState(() { _selectedStudent = s; _classStudents = []; _selectedClassFilter = null; }); },
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -349,18 +357,26 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                         border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(8)
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(s['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                            child: Text(s['code'], style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey.shade700, fontSize: 10))
-                          ),
-                        ]
+                          _buildAvatar(s, 18), // HIỂN THỊ ẢNH Ở LƯỚI GRID
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
+                                  child: Text(s['code'], style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey.shade700, fontSize: 10))
+                                ),
+                              ]
+                            ),
+                          )
+                        ],
                       )
                     )
                   );
@@ -381,7 +397,8 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(child: Icon(Icons.person)), const SizedBox(width: 12),
+                        _buildAvatar(_selectedStudent, 24), // AVATAR Ở CARD CHỌN LỖI
+                        const SizedBox(width: 12),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(_selectedStudent!['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           Text('${_selectedStudent!['class_name']} - ${_selectedStudent!['code']}', style: TextStyle(color: Theme.of(context).colorScheme.primary)),

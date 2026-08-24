@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'tvtl_service.dart';
 import 'human_chat_room_screen.dart';
+import 'config.dart';
 
 class HumanChatListScreen extends StatefulWidget {
   const HumanChatListScreen({super.key});
@@ -73,7 +74,7 @@ class _HumanChatListScreenState extends State<HumanChatListScreen> {
 
   // --- Hàm build giao diện ---
   String _fixAvatarUrl(String url) {
-    if (url.isEmpty || url.length < 5) return 'https://qlnn.testifiyonline.xyz/static/default.png';
+    if (url.isEmpty || url.length < 5) return '${AppConfig.baseUrl}/static/default.png';
     if (!url.startsWith('http')) return '${TvtlService.pythonBaseUrl}/$url'.replaceAll('//static', '/static');
     return url;
   }

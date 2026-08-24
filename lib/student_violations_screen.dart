@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class StudentViolationsScreen extends StatefulWidget {
   const StudentViolationsScreen({super.key});
@@ -26,7 +27,7 @@ class _StudentViolationsScreenState extends State<StudentViolationsScreen> {
     final prefs = await SharedPreferences.getInstance();
     
     // Đã trỏ đúng về student_violations_api
-    String url = 'https://qlnn.testifiyonline.xyz/api/student_violations_api';
+    String url = '${AppConfig.baseUrl}/api/student_violations_api';
     if (weekParam != null) url += '?week=$weekParam';
     
     try {

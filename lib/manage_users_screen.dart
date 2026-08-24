@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
@@ -19,7 +20,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
   Future<void> _fetchData() async {
     final prefs = await SharedPreferences.getInstance();
-    final res = await http.get(Uri.parse('https://qlnn.testifiyonline.xyz/api/manage_users_api'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+    final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/manage_users_api'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
     final data = jsonDecode(res.body);
     if (data['status'] == 'success') setState(() { _users = data['users']; _classes = data['classes']; _isLoading = false; });
   }
@@ -42,7 +43,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
         FilledButton(onPressed: () async {
           Navigator.pop(c);
           final prefs = await SharedPreferences.getInstance();
-          final res = await http.post(Uri.parse('https://qlnn.testifiyonline.xyz/api/manage_users_api'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, body: jsonEncode({'action': 'assign_homeroom', 'user_id': userId, 'class_id': selectedClass ?? ''}));
+          final res = await http.post(Uri.parse('${AppConfig.baseUrl}/api/manage_users_api'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, body: jsonEncode({'action': 'assign_homeroom', 'user_id': userId, 'class_id': selectedClass ?? ''}));
           final data = jsonDecode(res.body);
           if (data['status'] == 'success') {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ ${data['msg']}'), backgroundColor: Colors.green));
@@ -83,7 +84,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             if (userCtrl.text.isEmpty || passCtrl.text.isEmpty || nameCtrl.text.isEmpty) return;
             Navigator.pop(c);
             final prefs = await SharedPreferences.getInstance();
-            final res = await http.post(Uri.parse('https://qlnn.testifiyonline.xyz/api/manage_users_api'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, body: jsonEncode({'action': 'create', 'username': userCtrl.text, 'password': passCtrl.text, 'full_name': nameCtrl.text, 'role': role}));
+            final res = await http.post(Uri.parse('${AppConfig.baseUrl}/api/manage_users_api'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, body: jsonEncode({'action': 'create', 'username': userCtrl.text, 'password': passCtrl.text, 'full_name': nameCtrl.text, 'role': role}));
             final data = jsonDecode(res.body);
             if (data['status'] == 'success') {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ ${data['msg']}'), backgroundColor: Colors.green));

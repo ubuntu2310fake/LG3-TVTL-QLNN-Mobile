@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main_shell.dart';
+import 'config.dart'; // 👉 1. THÊM IMPORT NÀY
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/api/login_api.php'), 
+        Uri.parse('${AppConfig.baseUrl}/api/login_api.php'), 
         body: {
           'username': _usernameCtrl.text.trim(),
           'password': _passwordCtrl.text,

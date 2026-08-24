@@ -2,8 +2,11 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://artifactory.appodeal.com/appodeal-public") }
     }
 }
+
+//rootProject.extra.set("ffmpegKitPackage", "full-gpl")
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory

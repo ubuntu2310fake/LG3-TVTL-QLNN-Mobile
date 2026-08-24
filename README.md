@@ -2,9 +2,10 @@
 
 Chào mừng đến với kho lưu trữ mã nguồn ứng dụng di động chính thức của **Trường THPT Lạng Giang số 3**. Ứng dụng được phát triển nhằm mục đích hiện đại hóa công tác quản lý học đường và hỗ trợ sức khỏe tinh thần cho học sinh.
 
-![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Android-green.svg)
 ![Flutter](https://img.shields.io/badge/built_with-Flutter-02569B.svg)
+![License](https://img.shields.io/badge/license-GPLv3-orange.svg)
 
 ## ✨ Tính năng nổi bật
 
@@ -22,6 +23,9 @@ Chào mừng đến với kho lưu trữ mã nguồn ứng dụng di động ch�
 ## 📥 Hướng dẫn cài đặt
 Học sinh và Giáo viên có thể tải trực tiếp file APK bản mới nhất tại mục **[Releases](../../releases/latest)** của kho lưu trữ này.
 * Hệ thống hỗ trợ tự động kiểm tra cập nhật và thông báo cài đặt ngay bên trong ứng dụng.
+
+## 📄 Giấy phép (License)
+Dự án được phát hành theo giấy phép mã nguồn mở **GNU General Public License v3.0 (GPLv3)**. Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 
 ## 👨‍💻 Phát triển bởi
 * **Tác giả:** Trương Hiếu & Tập thể A1-K48

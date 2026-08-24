@@ -24,13 +24,17 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        
+        // Bật tính năng Desugaring (Cú pháp KTS)
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
+    // =======================================================
 
-    // 1. TẠO CHỮ KÝ RELEASE DỰA TRÊN FILE KEY.PROPERTIES TỪ GITHUB NÉM VÀO
+    // TẠO CHỮ KÝ RELEASE DỰA TRÊN FILE KEY.PROPERTIES
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"] as String?
@@ -41,10 +45,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.lg3.quan_ly_nen_nep"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -53,16 +54,29 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // 2. ĐÃ SỬA: ÉP ỨNG DỤNG DÙNG CHỮ KÝ CHÍNH THỨC KHI XUẤT BẢN CẬP NHẬT
+            // ÉP ỨNG DỤNG DÙNG CHỮ KÝ CHÍNH THỨC KHI XUẤT BẢN
             signingConfig = signingConfigs.getByName("release")
             
-            // THÊM DÒNG NÀY VÀO ĐỂ BẢO VỆ CODE KHỎI R8:
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            // KHÔNG ĐƯỢC PHÉP CHO R8 LÀM RỐI CODE
+            isMinifyEnabled = false
+            isShrinkResources = false
+            
+            // BẢO VỆ CODE KHỎI R8
+            //proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
+    }
+    
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 
 flutter {
     source = "../.."
+}
+
+// Thêm thư viện hỗ trợ dịch Java 8 (Cú pháp KTS)
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

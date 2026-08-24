@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -27,7 +28,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       
-      String url = 'https://qlnn.testifiyonline.xyz/api/teacher_dashboard_api';
+      String url = '${AppConfig.baseUrl}/api/teacher_dashboard_api';
       if (_week.isNotEmpty) url += '?week=$_week';
 
       final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
@@ -52,7 +53,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/api/teacher_dashboard_api'),
+        Uri.parse('${AppConfig.baseUrl}/api/teacher_dashboard_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({'action': 'delete_violation', 'id': id}),
       );

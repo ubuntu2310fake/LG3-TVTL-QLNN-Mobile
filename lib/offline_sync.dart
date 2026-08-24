@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'config.dart';
 
 class OfflineSyncService {
   static final _key = encrypt.Key.fromUtf8('LG3_TVTL_QLNN_SecretKey_2026_XYZ'); 
@@ -15,7 +16,7 @@ class OfflineSyncService {
   // 1. TẢI CỤC MÃ HÓA SERVER VỀ LƯU TRỰC TIẾP
   static Future<bool> syncData() async {
     try {
-      final res = await http.get(Uri.parse('https://qlnn.testifiyonline.xyz/api/sync_data_secure.php'));
+      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/sync_data_secure.php'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'success' && data['secure_payload'] != null) {
         final file = await _getFile();

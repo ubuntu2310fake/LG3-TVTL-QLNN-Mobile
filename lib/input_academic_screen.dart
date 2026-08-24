@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class InputAcademicScreen extends StatefulWidget {
   const InputAcademicScreen({super.key});
@@ -29,7 +30,7 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
-      String url = 'https://qlnn.testifiyonline.xyz/api/input_academic_api';
+      String url = '${AppConfig.baseUrl}/api/input_academic_api';
       if (_week.isNotEmpty) url += '?week=$_week';
 
       final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
@@ -41,8 +42,11 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
         
         for (var c in _classesData) {
           int cid = c['class_id'];
-          _scoreCtrls[cid] = TextEditingController(text: c['score'] == 0 ? '' : c['score'].toString());
-          _countCtrls[cid] = TextEditingController(text: c['count'] == 0 ? '' : c['count'].toString());
+          // FIX 1: Chống null crash an toàn tuyệt đối
+          var score = c['score'];
+          var count = c['count'];
+          _scoreCtrls[cid] = TextEditingController(text: (score == null || score == 0) ? '' : score.toString());
+          _countCtrls[cid] = TextEditingController(text: (count == null || count == 0) ? '' : count.toString());
         }
         setState(() => _isLoading = false);
       }
@@ -55,26 +59,55 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
     setState(() => _isSaving = true);
     try {
       List<Map<String, dynamic>> scoresToSave = [];
+      bool hasChanges = false;
       for (var c in _classesData) {
         int cid = c['class_id'];
-        scoresToSave.add({
-          'class_id': cid,
-          'score': _scoreCtrls[cid]!.text.isEmpty ? 0 : double.parse(_scoreCtrls[cid]!.text),
-          'count': _countCtrls[cid]!.text.isEmpty ? 0 : int.parse(_countCtrls[cid]!.text),
-        });
+        
+        // FIX 2: Xử lý thay thế dấu phẩy thành dấu chấm trước khi Parse. Dùng tryParse chống crash.
+        String rawScore = _scoreCtrls[cid]!.text.replaceAll(',', '.').trim();
+        String rawCount = _countCtrls[cid]!.text.trim();
+        
+        double currentScore = rawScore.isEmpty ? 0 : (double.tryParse(rawScore) ?? 0);
+        int currentCount = rawCount.isEmpty ? 0 : (int.tryParse(rawCount) ?? 0);
+        
+        double oldScore = c['score'] == null ? 0 : (c['score'] as num).toDouble();
+        int oldCount = c['count'] ?? 0;
+
+        // Chỉ lưu nếu có sai khác
+        if ((currentScore - oldScore).abs() > 0.001 || currentCount != oldCount) {
+          scoresToSave.add({
+            'class_id': cid,
+            'score': currentScore,
+            'count': currentCount,
+          });
+          hasChanges = true;
+        }
+      }
+
+      if (!hasChanges) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Không có dữ liệu lớp nào thay đổi để lưu!'), backgroundColor: Colors.orange));
+        }
+        setState(() => _isSaving = false);
+        return;
       }
 
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       
       final response = await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/api/input_academic_api'),
+        Uri.parse('${AppConfig.baseUrl}/api/input_academic_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({'week': _week, 'scores': scoresToSave}),
       );
 
       final data = jsonDecode(response.body);
       if (data['status'] == 'success' && mounted) {
+        for (var saved in scoresToSave) {
+          var c = _classesData.firstWhere((element) => element['class_id'] == saved['class_id']);
+          c['score'] = saved['score'];
+          c['count'] = saved['count'];
+        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã lưu điểm học tập!'), backgroundColor: Colors.green));
       }
     } catch (e) {

@@ -4,10 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 // ĐÃ THÊM: Thư viện để upload file multipart
 import 'package:http_parser/http_parser.dart'; 
 import 'package:mime/mime.dart';
+import 'config.dart';
 
 class TvtlService {
-  static const String phpBaseUrl = 'https://qlnn.testifiyonline.xyz';
-  static const String pythonBaseUrl = 'https://tvtl.testifiyonline.xyz';
+  static const String phpBaseUrl = '${AppConfig.baseUrl}';
+  static const String pythonBaseUrl = '${AppConfig.tvtlbaseUrl}';
 
   // --- 1. SSO ĐĂNG NHẬP LIÊN THÔNG ---
   static Future<bool> ensurePythonLogin() async {

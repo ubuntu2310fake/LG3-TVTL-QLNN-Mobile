@@ -9,9 +9,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'device_helper.dart';
 import 'main.dart'; // Lấy cả themeNotifier và currentAppVersion từ đây
+import 'config.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -23,9 +25,10 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _themeMode = 'system';
   bool _isNotiEnabled = false;
+  String _videoEncoder = 'hardware'; // Cài đặt mới cho HLS Encoder
+  String _lang = 'vi';
   
   String _fwVersion = 'Đang tải...';
-  String _engineVersion = 'Đang tải...';
   bool _isCheckingUpdate = false; 
 
   @override
@@ -40,25 +43,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _themeMode = prefs.getString('theme_mode') ?? 'system';
       _isNotiEnabled = prefs.getBool('push_enabled') ?? false;
+      _videoEncoder = prefs.getString('video_encoder') ?? 'hardware'; // Load cấu hình encoder
+      _lang = prefs.getString('lang') ?? 'vi';
     });
+  }
+
+  Future<void> _changeLang(String lang) async {
+    setState(() => _lang = lang);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lang', lang);
+    try {
+      final cookieManager = WebViewCookieManager();
+      await cookieManager.setCookie(
+        WebViewCookie(
+          name: 'lang',
+          value: lang,
+          domain: AppConfig.domain,
+          path: '/',
+        ),
+      );
+    } catch (e) {}
   }
 
   Future<void> _fetchServerInfo() async {
     try {
-      final res = await http.get(Uri.parse('https://qlnn.testifiyonline.xyz/api/system_info_api'));
+      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/system_info_api'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'success') {
         setState(() {
           _fwVersion = data['firmware_version'];
-          _engineVersion = data['engine_version'];
         });
       }
     } catch (e) {
-      setState(() { _fwVersion = 'Lỗi kết nối'; _engineVersion = 'Lỗi kết nối'; });
+      setState(() { _fwVersion = 'Lỗi kết nối'; });
     }
   }
 
-  // ĐÃ FIX: Thêm ngoặc nhọn { } để trị lỗi gạch chân xanh Linter
   Future<void> _changeTheme(String mode) async {
     setState(() => _themeMode = mode);
     final prefs = await SharedPreferences.getInstance();
@@ -71,6 +91,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       themeNotifier.value = ThemeMode.system;
     }
+  }
+
+  // Hàm mới để thay đổi chế độ mã hóa Video
+  Future<void> _changeEncoder(String mode) async {
+    setState(() => _videoEncoder = mode);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('video_encoder', mode);
   }
 
   Future<void> _toggleNotification(bool value) async {
@@ -89,14 +116,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         if (fcmToken != null) {
           await http.post(
-            Uri.parse('https://qlnn.testifiyonline.xyz/api/subscribe'),
+            Uri.parse('${AppConfig.baseUrl}/api/subscribe'),
             headers: {'Content-Type': 'application/json', 'Cookie': 'PHPSESSID=$sessionId'},
             body: jsonEncode({'endpoint': fcmToken, 'platform': 'app', 'device_model': realModel}),
           );
         }
       } else {
         await http.post(
-          Uri.parse('https://qlnn.testifiyonline.xyz/gate_check'),
+          Uri.parse('${AppConfig.baseUrl}/gate_check'),
           headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
           body: 'delete_id=0&only_push=1' 
         );
@@ -120,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final dio = Dio();
       final response = await dio.get(
-        'https://qlnn.testifiyonline.xyz/api/check_update.php',
+        '${AppConfig.baseUrl}/api/check_update.php',
         queryParameters: {
           'version': currentAppVersion,
           'abi': primaryAbi,
@@ -258,6 +285,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 25),
 
+          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('NGÔN NGỮ / LANGUAGE', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Card(
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            child: Column(
+              children: [
+                RadioListTile(value: 'vi', groupValue: _lang, title: const Text('Tiếng Việt 🇻🇳'), onChanged: (v) => _changeLang(v.toString())),
+                const Divider(height: 1, indent: 60),
+                RadioListTile(value: 'en', groupValue: _lang, title: const Text('English 🇬🇧'), onChanged: (v) => _changeLang(v.toString())),
+              ],
+            ),
+          ),
+          const SizedBox(height: 25),
+
+          // PHẦN MỚI BỔ SUNG CHO HLS ENCODER
+          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('BỘ MÃ HÓA VIDEO HLS (APP)', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Card(
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            child: Column(
+              children: [
+                RadioListTile(
+                  value: 'hardware', 
+                  groupValue: _videoEncoder, 
+                  title: const Text('Phần cứng (MediaCodec/VideoToolbox)'), 
+                  subtitle: const Text('Tốc độ nhanh, tiết kiệm pin, dùng chip GPU'),
+                  secondary: const Icon(Icons.memory, color: Colors.green), 
+                  onChanged: (v) => _changeEncoder(v.toString())
+                ),
+                const Divider(height: 1, indent: 60),
+                RadioListTile(
+                  value: 'software', 
+                  groupValue: _videoEncoder, 
+                  title: const Text('Phần mềm (libx264)'), 
+                  subtitle: const Text('Chậm hơn, dùng sức mạnh CPU, độ ổn định cao'),
+                  secondary: const Icon(Icons.developer_board, color: Colors.blueGrey), 
+                  onChanged: (v) => _changeEncoder(v.toString())
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 25),
+
           const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('TÙY CHỈNH THÔNG BÁO', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
           Card(
             elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
@@ -286,12 +354,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.cloud_done, color: Colors.green),
                   title: const Text('Phiên bản Firmware Server'),
                   trailing: Text('v$_fwVersion', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-                const Divider(height: 1, indent: 50),
-                ListTile(
-                  leading: const Icon(Icons.memory, color: Colors.purple),
-                  title: const Text('LG3 Guard Engine'),
-                  trailing: Text('v$_engineVersion', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
                 const Divider(height: 1, indent: 50),
                 

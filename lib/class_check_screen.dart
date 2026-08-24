@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'offline_sync.dart';
+import 'offline_queue_service.dart'; // ĐÃ THÊM IMPORT
+import 'config.dart'; // 👉 THÊM IMPORT NÀY
 
 class ClassCheckScreen extends StatefulWidget {
   const ClassCheckScreen({super.key});
@@ -79,7 +81,7 @@ class _ClassCheckScreenState extends State<ClassCheckScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       
-      final String url = 'https://qlnn.testifiyonline.xyz/class_check.php?action=load_matrix&class_id=$_selectedClassId&week=${_weekCtrl.text}';
+      final String url = '${AppConfig.baseUrl}/class_check.php?action=load_matrix&class_id=$_selectedClassId&week=${_weekCtrl.text}';
       
       final response = await http.get(
         Uri.parse(url),
@@ -169,7 +171,7 @@ class _ClassCheckScreenState extends State<ClassCheckScreen> {
       final sessionId = prefs.getString('phpsessid') ?? '';
 
       final response = await http.post(
-        Uri.parse('https://qlnn.testifiyonline.xyz/class_check.php?action=save_matrix'), // FIX URL (Thiếu .php)
+        Uri.parse('${AppConfig.baseUrl}/class_check.php?action=save_matrix'), // FIX URL (Thiếu .php)
         headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Cookie': 'PHPSESSID=$sessionId' },
         body: jsonEncode(payload),
       );
@@ -180,7 +182,18 @@ class _ClassCheckScreenState extends State<ClassCheckScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã lưu bảng điểm!'), backgroundColor: Colors.green));
       } else { throw Exception(data['msg'] ?? "Lỗi server"); }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Lỗi kết nối!'), backgroundColor: Colors.red));
+      // FIX OFFLINE: Đẩy vào Queue
+      await OfflineQueueService.enqueue(
+        url: '${AppConfig.baseUrl}/class_check.php?action=save_matrix',
+        method: 'POST',
+        contentType: 'application/json; charset=UTF-8',
+        body: payload, // Dart map, service sẽ tự jsonEncode
+        title: 'Chấm điểm lớp: $_selectedClassId - Tuần ${_weekCtrl.text}',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Mất mạng! Đã lưu Offline ngầm.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: Colors.orange));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

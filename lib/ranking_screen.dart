@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class RankingScreen extends StatefulWidget {
   const RankingScreen({super.key});
@@ -34,7 +35,7 @@ class _RankingScreenState extends State<RankingScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
 
-      String url = 'https://qlnn.testifiyonline.xyz/api/ranking_api';
+      String url = '${AppConfig.baseUrl}/api/ranking_api';
       if (_week.isNotEmpty) url += '?week=$_week';
 
       final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
