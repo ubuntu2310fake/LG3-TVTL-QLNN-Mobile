@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -51,7 +52,7 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
         });
       }
     } catch (e) {
-      _showMsg('Lỗi tải danh sách: $e', isError: true);
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Lỗi tải danh sách: $e' : 'Error loading list: $e', isError: true);
     }
     setState(() => _isLoadingExams = false);
   }
@@ -66,13 +67,13 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
         options: Options(contentType: Headers.jsonContentType),
       );
       if (res.data['status'] == 'success') {
-        _showMsg('Tạo kỳ thi thành công!');
+        _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Tạo kỳ thi thành công!' : 'Exam created successfully!');
         _fetchExams();
       } else {
         _showMsg(res.data['msg'], isError: true);
       }
     } catch (e) {
-      _showMsg('Lỗi kết nối API', isError: true);
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Lỗi kết nối API' : 'API connection error', isError: true);
     }
   }
 
@@ -92,19 +93,19 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
           ),
           title: Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-              const SizedBox(width: 10),
-              Expanded(child: Text('Xác nhận xóa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black87))),
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 10),
+              Expanded(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận xóa' : 'Xac nhan xoa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black87))),
             ],
           ),
           content: Text(
-            'Bạn có chắc chắn muốn xóa kỳ thi "$examName"? Toàn bộ điểm số liên quan sẽ bị xóa sạch và KHÔNG THỂ KHÔI PHỤC.', 
+            LocalizationService().currentLanguage == 'vi' ? 'Bạn có chắc chắn muốn xóa kỳ thi "$examName"? Toàn bộ điểm số liên quan sẽ bị xóa sạch và KHÔNG THỂ KHÔI PHỤC.' : 'Ban co chac chan muon xoa ky thi "$examName"? Toan bo diem so lien quan se bi xoa sach va KHONG THE KHOI PHUC.', 
             style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 14)
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false), 
-              child: const Text('Hủy', style: TextStyle(color: Colors.grey))
+              child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel', style: TextStyle(color: Colors.grey))
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -112,7 +113,7 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
               ),
               onPressed: () => Navigator.pop(ctx, true), 
-              child: const Text('Xóa vĩnh viễn', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa vĩnh viễn' : 'Xoa vinh vien', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -124,10 +125,10 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
     setState(() => _isLoadingExams = true);
     try {
       await _getDio().get('${AppConfig.baseUrl}/api/manage_exams_api.php?action=delete&id=$id');
-      _showMsg('Đã xóa kỳ thi $examName!');
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Đã xóa kỳ thi $examName!' : 'Da xoa ky thi $examName!');
       _fetchExams();
     } catch (e) {
-      _showMsg('Lỗi xóa kỳ thi', isError: true);
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Lỗi xóa kỳ thi' : 'Error deleting exam', isError: true);
     }
   }
 
@@ -141,13 +142,13 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
       });
       final res = await _getDio().post('${AppConfig.baseUrl}/api/import_scores_api.php', data: formData);
       if (res.data['status'] == 'success') {
-        _showMsg('Nhập và tính điểm thành công!');
+        _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Nhập và tính điểm thành công!' : 'Scores entered and calculated successfully!');
         setState(() => _selectedFile = null);
       } else {
         _showMsg(res.data['msg'], isError: true);
       }
     } catch (e) {
-      _showMsg('Lỗi tải file lên VPS', isError: true);
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Lỗi tải file lên VPS' : 'Error uploading file to VPS', isError: true);
     }
     setState(() => _isUploading = false);
   }
@@ -158,23 +159,23 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
 
   void _showCreateDialog() {
     final nameCtrl = TextEditingController();
-    final schoolCtrl = TextEditingController(text: 'THPT Lạng Giang số 3');
+    final schoolCtrl = TextEditingController(text: LocalizationService().currentLanguage == 'vi' ? 'THPT Lạng Giang số 3' : 'THPT Lang Giang so 3');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).cardColor,
-        title: const Text('Tạo Kỳ thi mới', style: TextStyle(color: Colors.blue)),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo Kỳ thi mới' : 'Create New Exam', style: TextStyle(color: Colors.blue)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên kỳ thi (VD: Giữa kỳ 1)')),
-            const SizedBox(height: 10),
-            TextField(controller: schoolCtrl, decoration: const InputDecoration(labelText: 'Tên trường')),
+            TextField(controller: nameCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Tên kỳ thi (VD: Giữa kỳ 1)' : 'Exam Name (e.g. Midterm 1)')),
+            SizedBox(height: 10),
+            TextField(controller: schoolCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Tên trường' : 'School Name')),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
-          ElevatedButton(onPressed: () => _createExam(nameCtrl.text, schoolCtrl.text), child: const Text('Tạo mới')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(onPressed: () => _createExam(nameCtrl.text, schoolCtrl.text), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo mới' : 'Create')),
         ],
       ),
     );
@@ -186,11 +187,11 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? Theme.of(context).scaffoldBackgroundColor : Colors.grey.shade100,
-      appBar: AppBar(title: const Text('Quản lý Kỳ thi & Điểm')),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Quản lý Kỳ thi & Điểm' : 'Manage Exams & Scores')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Tạo kỳ thi'),
+        icon: Icon(Icons.add),
+        label: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo kỳ thi' : 'Create exam'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
@@ -206,16 +207,16 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Nhập điểm từ Excel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
-                    const SizedBox(height: 16),
+                    Text(LocalizationService().currentLanguage == 'vi' ? 'Nhập điểm từ Excel' : 'Import scores from Excel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+                    SizedBox(height: 16),
                     DropdownButtonFormField<dynamic>(
                       dropdownColor: Theme.of(context).cardColor,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), labelText: '1. Chọn kỳ thi mục tiêu'),
-                      value: _selectedExamId,
+                      decoration: InputDecoration(border: OutlineInputBorder(), labelText: LocalizationService().currentLanguage == 'vi' ? '1. Chọn kỳ thi mục tiêu' : '1. Select target exam'),
+                      initialValue: _selectedExamId,
                       items: _exams.map((ex) => DropdownMenuItem(value: ex['id'], child: Text(ex['exam_name']))).toList(),
                       onChanged: (val) => setState(() => _selectedExamId = val),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     InkWell(
                       onTap: () async {
                         FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx']);
@@ -226,29 +227,29 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           border: Border.all(color: isDark ? Colors.green.shade700 : Colors.green.shade400, width: 2, style: BorderStyle.solid),
-                          color: isDark ? Colors.green.withOpacity(0.1) : Colors.green.shade50,
+                          color: isDark ? Colors.green.withValues(alpha: 0.1) : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
                           children: [
                             Icon(Icons.file_upload, size: 40, color: isDark ? Colors.green.shade400 : Colors.green.shade600),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             Text(
-                              _selectedFile != null ? _selectedFile!.name : '2. Bấm để chọn file .xlsx', 
+                              _selectedFile != null ? _selectedFile!.name : LocalizationService().currentLanguage == 'vi' ? '2. Bấm để chọn file .xlsx' : '2. Tap to select .xlsx file', 
                               style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                        icon: _isUploading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.check_circle),
-                        label: Text(_isUploading ? 'Đang xử lý DB...' : 'Bắt đầu Lưu vào DB'),
+                        icon: _isUploading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.check_circle),
+                        label: Text(_isUploading ? LocalizationService().currentLanguage == 'vi' ? 'Đang xử lý DB...' : 'Dang xu ly DB...' : LocalizationService().currentLanguage == 'vi' ? 'Bắt đầu Lưu vào DB' : 'Bat dau Luu vao DB'),
                         onPressed: (_selectedExamId != null && _selectedFile != null && !_isUploading) ? _uploadExcel : null,
                       ),
                     )
@@ -256,7 +257,7 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             
             // DANH SÁCH KỲ THI
             Card(
@@ -267,17 +268,17 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Lịch sử Kỳ thi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    if (_isLoadingExams) const Center(child: CircularProgressIndicator()),
-                    if (!_isLoadingExams && _exams.isEmpty) const Text('Chưa có dữ liệu.'),
+                    Text(LocalizationService().currentLanguage == 'vi' ? 'Lịch sử Kỳ thi' : 'Exam History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 10),
+                    if (_isLoadingExams) Center(child: CircularProgressIndicator()),
+                    if (!_isLoadingExams && _exams.isEmpty) Text(LocalizationService().currentLanguage == 'vi' ? 'Chưa có dữ liệu.' : 'Chua co du lieu.'),
                     if (!_isLoadingExams)
                       ..._exams.map((ex) => ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(ex['exam_name'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                         subtitle: Text('${ex['school_name']} | ID: ${ex['id']}', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(Icons.delete, color: Colors.red),
                           // GỌI HÀM XÓA CÓ CONFIRM
                           onPressed: () => _deleteExam(ex['id'], ex['exam_name']),
                         ),

@@ -1,4 +1,6 @@
+import 'localization_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'tvtl_service.dart';
 
 class AiConsultingScreen extends StatefulWidget {
@@ -29,7 +31,7 @@ class _AiConsultingScreenState extends State<AiConsultingScreen> {
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _adviceResult = result ?? "Xin lỗi, hiện tại AI không thể kết nối. Vui lòng thử lại sau.";
+        _adviceResult = result ?? (LocalizationService().currentLanguage == 'vi' ? "Xin lỗi, hiện tại AI không thể kết nối. Vui lòng thử lại sau." : "Sorry, AI is currently unreachable. Please try again later.");
       });
     }
   }
@@ -40,65 +42,73 @@ class _AiConsultingScreenState extends State<AiConsultingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Góc Tư Vấn AI', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: isDark ? Colors.purple.withOpacity(0.1) : Colors.purple.shade50,
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Góc Tư Vấn AI' : 'AI Counseling Corner', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: isDark ? Colors.purple.withValues(alpha: 0.1) : Colors.purple.shade50,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Hãy chia sẻ vấn đề của bạn, AI Tâm lý học đường sẽ đưa ra lời khuyên dành cho bạn.',
+            Text(
+              LocalizationService().currentLanguage == 'vi' ? 'Hãy chia sẻ vấn đề của bạn, AI Tâm lý học đường sẽ đưa ra lời khuyên dành cho bạn.' : 'Please share your problems, School Psychology AI will give you advice.',
               style: TextStyle(color: Colors.blueGrey, fontSize: 14),
             ),
-            const SizedBox(height: 15),
+            SizedBox(height: 15),
             
             TextField(
               controller: _promptCtrl,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Ví dụ: Dạo này em cảm thấy áp lực học tập quá...',
+                hintText: LocalizationService().currentLanguage == 'vi' ? 'Ví dụ: Dạo này em cảm thấy áp lực học tập quá...' : 'Example: I have been feeling very stressed about my studies lately...',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surface,
               ),
             ),
-            const SizedBox(height: 15),
+            SizedBox(height: 15),
             
             SizedBox(
               height: 50,
               child: FilledButton.icon(
                 onPressed: _isLoading ? null : _submitPrompt,
                 icon: _isLoading 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.send),
-                label: Text(_isLoading ? 'ĐANG PHÂN TÍCH...' : 'GỬI CHO AI', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Icon(Icons.send),
+                label: Text(_isLoading ? LocalizationService().currentLanguage == 'vi' ? 'ĐANG PHÂN TÍCH...' : 'ANALYZING...' : LocalizationService().currentLanguage == 'vi' ? 'GỬI CHO AI' : 'SEND TO AI', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                 style: FilledButton.styleFrom(backgroundColor: Colors.purple),
               ),
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: 30),
 
             if (_adviceResult != null)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.purple.withOpacity(0.1) : Colors.purple.shade50,
+                  color: isDark ? Colors.purple.withValues(alpha: 0.1) : Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.purple.shade100),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(Icons.psychology, color: Colors.purple),
                         SizedBox(width: 8),
-                        Text('AI Khuyên bạn:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple, fontSize: 16)),
+                        Text(LocalizationService().currentLanguage == 'vi' ? 'AI Khuyên bạn:' : 'AI Advice:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple, fontSize: 16)),
                       ],
                     ),
                     const Divider(color: Colors.black12, height: 20),
-                    Text(_adviceResult!, style: TextStyle(fontSize: 15, height: 1.5, color: isDark ? Colors.white70 : Colors.black87)),
+                    MarkdownBody(
+                      data: _adviceResult!,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 15, height: 1.5),
+                        h3: TextStyle(color: Colors.purple, fontSize: 18, fontWeight: FontWeight.bold),
+                        listBullet: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+                        strong: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -18,11 +19,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Future<void> _submitChange() async {
     if (_newPassCtrl.text != _confirmPassCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Mật khẩu xác nhận không khớp!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Mật khẩu xác nhận không khớp!' : '❌ Passwords do not match!'), backgroundColor: Colors.red));
       return;
     }
     if (_newPassCtrl.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Mật khẩu phải từ 6 ký tự!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Mật khẩu phải từ 6 ký tự!' : '❌ Password must be at least 6 characters!'), backgroundColor: Colors.red));
       return;
     }
 
@@ -51,7 +52,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ ${data['msg']}'), backgroundColor: Colors.red));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Lỗi kết nối: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi kết nối: $e' : '❌ Connection error: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -81,18 +82,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Đổi Mật Khẩu', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Đổi Mật Khẩu' : 'Change Password', style: TextStyle(fontWeight: FontWeight.bold))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.lock_reset, size: 80, color: Colors.blue),
-            const SizedBox(height: 20),
-            _buildPassField('Mật khẩu hiện tại', _oldPassCtrl, _isObscureOld, () => setState(() => _isObscureOld = !_isObscureOld), isDark),
-            _buildPassField('Mật khẩu mới', _newPassCtrl, _isObscureNew, () => setState(() => _isObscureNew = !_isObscureNew), isDark),
-            _buildPassField('Xác nhận mật khẩu mới', _confirmPassCtrl, _isObscureConfirm, () => setState(() => _isObscureConfirm = !_isObscureConfirm), isDark),
-            const SizedBox(height: 10),
+            Icon(Icons.lock_reset, size: 80, color: Colors.blue),
+            SizedBox(height: 20),
+            _buildPassField(LocalizationService().currentLanguage == 'vi' ? 'Mật khẩu hiện tại' : 'Current Password', _oldPassCtrl, _isObscureOld, () => setState(() => _isObscureOld = !_isObscureOld), isDark),
+            _buildPassField(LocalizationService().currentLanguage == 'vi' ? 'Mật khẩu mới' : 'New Password', _newPassCtrl, _isObscureNew, () => setState(() => _isObscureNew = !_isObscureNew), isDark),
+            _buildPassField(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận mật khẩu mới' : 'Confirm Password', _confirmPassCtrl, _isObscureConfirm, () => setState(() => _isObscureConfirm = !_isObscureConfirm), isDark),
+            SizedBox(height: 10),
             ElevatedButton(
               onPressed: _isLoading ? null : _submitChange,
               style: ElevatedButton.styleFrom(
@@ -102,8 +103,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _isLoading 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('LƯU MẬT KHẨU', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text(LocalizationService().currentLanguage == 'vi' ? 'LƯU MẬT KHẨU' : 'SAVE PASSWORD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             )
           ],
         ),

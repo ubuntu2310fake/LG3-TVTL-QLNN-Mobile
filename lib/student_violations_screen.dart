@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'localization_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'widgets/liquid_glass_container.dart';
 import 'config.dart';
 
 class StudentViolationsScreen extends StatefulWidget {
@@ -46,41 +48,63 @@ class _StudentViolationsScreenState extends State<StudentViolationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Lỗi Vi Phạm Của Tôi', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView(
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi Vi Phạm Của Tôi' : 'My Violations', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: _isLoading ? Center(child: CircularProgressIndicator()) : ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _fetchData(_week - 1)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(20)), child: Text('Tuần $_week', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-              IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _fetchData(_week + 1)),
+              IconButton(icon: Icon(Icons.chevron_left), onPressed: () => _fetchData(_week - 1)),
+              Container(padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8), decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(20)), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tuần $_week' : 'Tuan $_week', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+              IconButton(icon: Icon(Icons.chevron_right), onPressed: () => _fetchData(_week + 1)),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
 
-          const Text('LỖI CỦA TÔI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-          const SizedBox(height: 10),
+          Text('LỖI CỦA TÔI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          SizedBox(height: 10),
           if (_myVios.isEmpty) 
-            Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text('Tuyệt vời! Bạn không có vi phạm.', style: TextStyle(color: Colors.green))]))
+            LiquidGlassContainer(
+              padding: const EdgeInsets.all(15), 
+              borderRadius: BorderRadius.circular(10),
+              child: Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text(LocalizationService().currentLanguage == 'vi' ? 'Tuyệt vời! Bạn không có vi phạm.' : 'Tuyet voi! Ban khong co vi pham.', style: TextStyle(color: Colors.green))])
+            )
           else 
-            ..._myVios.map((v) => Card(child: ListTile(title: Text(v['recorded_violation_name'], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(v['date_created']), trailing: Text('-${v['recorded_points']}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18))))),
+            ..._myVios.map((v) => LiquidGlassContainer(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(title: Text(v['recorded_violation_name'], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(v['date_created']), trailing: Text('-${v['recorded_points']}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)))
+            )),
           
-          const SizedBox(height: 25),
+          SizedBox(height: 25),
+          Text('LỖI CHUNG CỦA LỚP', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+          SizedBox(height: 10),
+          if (_classVios.isEmpty)
+             LiquidGlassContainer(
+               padding: const EdgeInsets.all(15), 
+               borderRadius: BorderRadius.circular(10), 
+               child: Row(children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text(LocalizationService().currentLanguage == 'vi' ? 'Lớp không có lỗi chung.' : 'The class has no common violations.', style: TextStyle(color: Colors.green))])
+             )
+          else
+             ..._classVios.map((v) => LiquidGlassContainer(
+               margin: const EdgeInsets.only(bottom: 8),
+               child: ListTile(title: Text(v['recorded_violation_name'], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(v['date_created']), trailing: Text('-${v['recorded_points']}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 18)))
+             )),
 
-          const Text('SỔ ĐẦU BÀI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-          const SizedBox(height: 10),
-          Card(
+          SizedBox(height: 25),
+
+          Text(LocalizationService().currentLanguage == 'vi' ? 'SỔ ĐẦU BÀI' : 'SO DAU BAI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+          SizedBox(height: 10),
+          LiquidGlassContainer(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columnSpacing: 20,
-                columns: const [
-                  DataColumn(label: Text('Thứ')), DataColumn(label: Text('SS')), DataColumn(label: Text('VS')),
+                columns: [
+                  DataColumn(label: Text(LocalizationService().currentLanguage == 'vi' ? 'Thứ' : 'Day')), DataColumn(label: Text('SS')), DataColumn(label: Text('VS')),
                   DataColumn(label: Text('CSVC')), DataColumn(label: Text('TB')), DataColumn(label: Text('XE')),
                   DataColumn(label: Text('DP')), DataColumn(label: Text('SV')), DataColumn(label: Text('THE')),
-                  DataColumn(label: Text('DT')), DataColumn(label: Text('Tổng')),
+                  DataColumn(label: Text('DT')), DataColumn(label: Text(LocalizationService().currentLanguage == 'vi' ? 'Tổng' : 'Tong')),
                 ],
                 rows: _matrixData.map<DataRow>((row) {
                   List<DataCell> cells = [DataCell(Text(row['label'].toString(), style: const TextStyle(fontWeight: FontWeight.bold)))];
@@ -93,7 +117,21 @@ class _StudentViolationsScreenState extends State<StudentViolationsScreen> {
               ),
             ),
           ),
-          Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: Align(alignment: Alignment.centerRight, child: Text('TỔNG ĐIỂM: $_matrixTotal', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.blue)))),
+          ..._matrixData.where((row) => row['notes'] != null && row['notes'].toString().isNotEmpty).map((row) => 
+            LiquidGlassContainer(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(8),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber, size: 16, color: Colors.red),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('${row['label']}: ${row['notes']}', style: const TextStyle(color: Colors.red, fontSize: 13, fontStyle: FontStyle.italic))),
+                ],
+              )
+            )
+          ),
+          Padding(padding: EdgeInsets.only(top: 8, right: 8), child: Align(alignment: Alignment.centerRight, child: Text(LocalizationService().currentLanguage == 'vi' ? 'TỔNG ĐIỂM: $_matrixTotal' : 'TONG DIEM: $_matrixTotal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.blue)))),
         ],
       ),
     );

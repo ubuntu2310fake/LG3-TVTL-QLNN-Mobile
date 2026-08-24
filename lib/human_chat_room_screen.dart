@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
@@ -84,14 +85,14 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image == null || !mounted) return;
 
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (_) => Center(child: CircularProgressIndicator()));
     String? imgUrlPrefix = await TvtlService.uploadChatFile(image.path);
     if (mounted) Navigator.pop(context); 
 
     if (imgUrlPrefix != null) {
       await _sendMessage(contentOverride: imgUrlPrefix);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload ảnh thất bại, vui lòng thử lại.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Upload ảnh thất bại, vui lòng thử lại.' : 'Image upload failed, please try again.')));
     }
   }
 
@@ -99,7 +100,7 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
     bool isMe = msg['sender_id'].toString() != widget.partnerId;
     String rawContent = msg['content'].toString();
     bool isImage = rawContent.startsWith('[IMG]:');
-    String displayContent = isImage ? 'đã gửi một ảnh' : (rawContent.length > 50 ? '${rawContent.substring(0, 50)}...' : rawContent);
+    String displayContent = isImage ? LocalizationService().currentLanguage == 'vi' ? 'đã gửi một ảnh' : 'sent a photo' : (rawContent.length > 50 ? '${rawContent.substring(0, 50)}...' : rawContent);
 
     showModalBottomSheet(
       context: context, backgroundColor: Colors.transparent,
@@ -115,21 +116,21 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
             ),
             const Divider(height: 1),
             if (!isImage)
-              ListTile(leading: const Icon(Icons.copy, color: Colors.blue), title: const Text('Chép văn bản'), onTap: () {
+              ListTile(leading: Icon(Icons.copy, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chép văn bản' : 'Copy text'), onTap: () {
                 Clipboard.setData(ClipboardData(text: rawContent)); 
-                Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã chép vào bộ nhớ')));
+                Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đã chép vào bộ nhớ' : 'Copied to clipboard')));
               }),
-            ListTile(leading: const Icon(Icons.reply, color: Colors.deepOrange), title: const Text('Trả lời'), onTap: () {
+            ListTile(leading: Icon(Icons.reply, color: Colors.deepOrange), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Trả lời' : 'Reply'), onTap: () {
               Navigator.pop(context);
               setState(() { _replyingToMessage = msg; }); 
               _msgCtrl.clear(); 
               FocusScope.of(context).requestFocus(); 
             }),
             if (isMe)
-              ListTile(leading: const Icon(Icons.delete_forever, color: Colors.red), title: const Text('Xóa ở phía tôi', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), onTap: () {
+              ListTile(leading: Icon(Icons.delete_forever, color: Colors.red), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa ở phía tôi' : 'Delete for me', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), onTap: () {
                 Navigator.pop(context); _deleteMessage(msg['id']);
               }),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
           ],
         ),
       ),
@@ -139,7 +140,7 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
   Future<void> _deleteMessage(dynamic messageId) async {
     bool ok = await TvtlService.deleteMessage(messageId.toInt());
     if (ok) { await _loadMessages(forceScroll: false); } 
-    else if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể xóa tin nhắn này.'))); }
+    else if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Không thể xóa tin nhắn này.' : 'Cannot delete this message.'))); }
   }
 
   @override
@@ -148,12 +149,12 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0, title: Row(children: [CircleAvatar(backgroundImage: NetworkImage(widget.partnerAvatar), radius: 18, backgroundColor: Colors.grey.shade200), const SizedBox(width: 10), Expanded(child: Text(widget.partnerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis))]),
+        titleSpacing: 0, title: Row(children: [CircleAvatar(backgroundImage: NetworkImage(widget.partnerAvatar), radius: 18, backgroundColor: Colors.grey.shade200), SizedBox(width: 10), Expanded(child: Text(widget.partnerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis))]),
         elevation: 1, 
       ),
-      backgroundColor: isDark ? Theme.of(context).colorScheme.background : const Color(0xFFF0F2F5),
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surface : const Color(0xFFF0F2F5),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 Expanded(
@@ -169,7 +170,7 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                       bool hasReply = msg['reply_content'] != null && msg['reply_content'].toString().isNotEmpty;
                       String replyRaw = msg['reply_content']?.toString() ?? '';
                       bool replyIsImage = replyRaw.startsWith('[IMG]:');
-                      String replyDisplay = replyIsImage ? 'Mục: Hình ảnh' : replyRaw;
+                      String replyDisplay = replyIsImage ? LocalizationService().currentLanguage == 'vi' ? 'Mục: Hình ảnh' : 'Attachment: Image' : replyRaw;
 
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -183,7 +184,7 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                               decoration: BoxDecoration(
                                 color: isImage ? Colors.transparent : (isMe ? const Color(0xFF0084FF) : (isDark ? Colors.grey[800] : Colors.white)), 
                                 borderRadius: BorderRadius.circular(18), 
-                                boxShadow: isImage ? null : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 3, offset: const Offset(0, 1))]
+                                boxShadow: isImage ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 3, offset: const Offset(0, 1))]
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,19 +192,19 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                                   if (hasReply)
                                     Container(
                                       margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(color: isMe ? Colors.white.withOpacity(0.15) : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05)), borderRadius: BorderRadius.circular(12)),
+                                      decoration: BoxDecoration(color: isMe ? Colors.white.withValues(alpha: 0.15) : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)), borderRadius: BorderRadius.circular(12)),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Container(width: 2, height: 20, color: isMe ? Colors.white70 : Colors.blue.shade300),
-                                          const SizedBox(width: 8),
+                                          SizedBox(width: 8),
                                           Flexible(child: Text(replyDisplay, style: TextStyle(color: isMe ? Colors.white70 : Colors.blueGrey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                                         ],
                                       ),
                                     ),
                                   
                                   isImage
-                                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network('${TvtlService.pythonBaseUrl}${rawContent.replaceAll('[IMG]:', '')}', fit: BoxFit.cover, loadingBuilder: (_, c, l) => l == null ? c : Container(height: 150, width: 150, color: Colors.grey.shade300, child: const Center(child: CircularProgressIndicator())), errorBuilder: (_, e, s) => const Icon(Icons.broken_image, color: Colors.grey, size: 50)))
+                                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network('${TvtlService.pythonBaseUrl}${rawContent.replaceAll('[IMG]:', '')}', fit: BoxFit.cover, loadingBuilder: (_, c, l) => l == null ? c : Container(height: 150, width: 150, color: Colors.grey.shade300, child: Center(child: CircularProgressIndicator())), errorBuilder: (_, e, s) => Icon(Icons.broken_image, color: Colors.grey, size: 50)))
                                       : Text(rawContent, style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87), fontSize: 15, height: 1.3)),
                                 ],
                               ),
@@ -228,11 +229,11 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                           decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade100, borderRadius: BorderRadius.circular(12), border: const Border(left: BorderSide(color: Colors.deepOrange, width: 3))),
                           child: Row(
                             children: [
-                              const Icon(Icons.reply, color: Colors.deepOrange, size: 16),
-                              const SizedBox(width: 10),
+                              Icon(Icons.reply, color: Colors.deepOrange, size: 16),
+                              SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  _replyingToMessage!['content'].toString().startsWith('[IMG]:') ? 'Mục: Hình ảnh' : _replyingToMessage!['content'].toString(),
+                                  _replyingToMessage!['content'].toString().startsWith('[IMG]:') ? LocalizationService().currentLanguage == 'vi' ? 'Mục: Hình ảnh' : 'Attachment: Image' : _replyingToMessage!['content'].toString(),
                                   style: TextStyle(color: isDark ? Colors.grey[300] : Colors.blueGrey.shade700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -246,16 +247,16 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                       
                       Row(
                         children: [
-                          IconButton(icon: const Icon(Icons.image, color: Colors.blue), onPressed: _pickAndSendImage), 
+                          IconButton(icon: Icon(Icons.image, color: Colors.blue), onPressed: _pickAndSendImage), 
                           
                           Expanded(
                             child: TextField(
                               controller: _msgCtrl, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendMessage(),
-                              decoration: InputDecoration(hintText: 'Nhắn tin...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none), filled: true, fillColor: isDark ? Colors.grey[800] : Colors.grey.shade100, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), isDense: true),
+                              decoration: InputDecoration(hintText: LocalizationService().currentLanguage == 'vi' ? 'Nhắn tin...' : 'Type a message...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none), filled: true, fillColor: isDark ? Colors.grey[800] : Colors.grey.shade100, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), isDense: true),
                             ),
                           ),
-                          const SizedBox(width: 5),
-                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF0084FF)), onPressed: () => _sendMessage()),
+                          SizedBox(width: 5),
+                          IconButton(icon: Icon(Icons.send, color: Color(0xFF0084FF)), onPressed: () => _sendMessage()),
                         ],
                       ),
                     ],

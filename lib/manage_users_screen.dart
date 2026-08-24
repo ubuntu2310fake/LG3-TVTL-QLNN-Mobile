@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -28,18 +29,18 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   void _assignClass(int userId, String userName, int? currentClassId) {
     int? selectedClass = currentClassId;
     showDialog(context: context, builder: (c) => AlertDialog(
-      title: Text('Phân công $userName'),
+      title: Text(LocalizationService().currentLanguage == 'vi' ? 'Phân công $userName' : 'Phan cong $userName'),
       content: DropdownButtonFormField<int>(
-        value: selectedClass,
-        decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Chọn Lớp Chủ Nhiệm'),
+        initialValue: selectedClass,
+        decoration: InputDecoration(border: OutlineInputBorder(), labelText: LocalizationService().currentLanguage == 'vi' ? 'Chọn Lớp Chủ Nhiệm' : 'Chon Lop Chu Nhiem'),
         items: [
-          const DropdownMenuItem<int>(value: null, child: Text('-- Không đứng lớp --')),
+          DropdownMenuItem<int>(value: null, child: Text(LocalizationService().currentLanguage == 'vi' ? '-- Không đứng lớp --' : '-- No class --')),
           ..._classes.map<DropdownMenuItem<int>>((cl) => DropdownMenuItem(value: cl['id'], child: Text(cl['name'])))
         ],
         onChanged: (v) => selectedClass = v,
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Hủy')),
+        TextButton(onPressed: () => Navigator.pop(c), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel')),
         FilledButton(onPressed: () async {
           Navigator.pop(c);
           final prefs = await SharedPreferences.getInstance();
@@ -49,7 +50,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ ${data['msg']}'), backgroundColor: Colors.green));
             _fetchData();
           }
-        }, child: const Text('Lưu')),
+        }, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu' : 'Luu')),
       ],
     ));
   }
@@ -62,24 +63,24 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
     showDialog(context: context, builder: (c) => StatefulBuilder(
       builder: (context, setStateSB) => AlertDialog(
-        title: const Text('Tạo Tài Khoản Mới'),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo Tài Khoản Mới' : 'Tao Tai Khoan Moi'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: userCtrl, decoration: const InputDecoration(labelText: 'Tên đăng nhập (*)', border: OutlineInputBorder())), const SizedBox(height: 10),
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Họ và tên (*)', border: OutlineInputBorder())), const SizedBox(height: 10),
-              TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'Mật khẩu (*)', border: OutlineInputBorder()), obscureText: true), const SizedBox(height: 10),
+              TextField(controller: userCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Tên đăng nhập (*)' : 'Ten dang nhap (*)', border: OutlineInputBorder())), SizedBox(height: 10),
+              TextField(controller: nameCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Họ và tên (*)' : 'Ho va ten (*)', border: OutlineInputBorder())), SizedBox(height: 10),
+              TextField(controller: passCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Mật khẩu (*)' : 'Mat khau (*)', border: OutlineInputBorder()), obscureText: true), SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: role, decoration: const InputDecoration(labelText: 'Quyền hạn', border: OutlineInputBorder()),
-                items: const [DropdownMenuItem(value: 'TEACHER', child: Text('Giáo Viên')), DropdownMenuItem(value: 'ADMIN', child: Text('Quản Trị Viên'))],
+                initialValue: role, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Quyền hạn' : 'Quyen han', border: OutlineInputBorder()),
+                items: [DropdownMenuItem(value: 'TEACHER', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Giáo Viên' : 'Giao Vien')), DropdownMenuItem(value: 'ADMIN', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Quản Trị Viên' : 'Quan Tri Vien'))],
                 onChanged: (v) => setStateSB(() => role = v!),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel')),
           FilledButton(onPressed: () async {
             if (userCtrl.text.isEmpty || passCtrl.text.isEmpty || nameCtrl.text.isEmpty) return;
             Navigator.pop(c);
@@ -92,7 +93,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             } else {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ ${data['msg']}'), backgroundColor: Colors.red));
             }
-          }, child: const Text('Tạo mới')),
+          }, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo mới' : 'Create')),
         ],
       )
     ));
@@ -101,14 +102,14 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Quản Lý Người Dùng', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Quản Lý Người Dùng' : 'Manage Users', style: TextStyle(fontWeight: FontWeight.bold))),
       // THÊM NÚT TẠO USER Ở ĐÂY
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateUserDialog,
         backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.person_add, color: Colors.white),
+        child: Icon(Icons.person_add, color: Colors.white),
       ),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
+      body: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
         padding: const EdgeInsets.only(bottom: 80), // Cách nút dấu cộng
         itemCount: _users.length,
         itemBuilder: (c, i) {
@@ -119,9 +120,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               child: Icon(u['role'] == 'ADMIN' ? Icons.admin_panel_settings : Icons.school, color: u['role'] == 'ADMIN' ? Colors.red : Colors.blue),
             ),
             title: Text(u['full_name'] ?? '---', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("@${u['username']} - ${u['role']}\nLớp: ${u['class_name'] ?? 'Không'}"),
+            subtitle: Text(LocalizationService().currentLanguage == 'vi' ? "@${u['username']} - ${u['role']}\nLớp: ${u['class_name'] ?? 'Không'}" : "@${u['username']} - ${u['role']}\nClass: ${u['class_name'] ?? 'None'}"),
             isThreeLine: true,
-            trailing: IconButton(icon: const Icon(Icons.edit_note, color: Colors.blue), onPressed: () => _assignClass(u['id'], u['full_name'] ?? u['username'], u['homeroom_class_id'])),
+            trailing: IconButton(icon: Icon(Icons.edit_note, color: Colors.blue), onPressed: () => _assignClass(u['id'], u['full_name'] ?? u['username'], u['homeroom_class_id'])),
           ));
         },
       ),

@@ -47,4 +47,9 @@ app.*.map.json
 .gradle/
 *.jks
 key.properties
-._.
+*.db
+__pycache__/
+.DS_Store
+
+# Widget Preview related
+.widget_preview/

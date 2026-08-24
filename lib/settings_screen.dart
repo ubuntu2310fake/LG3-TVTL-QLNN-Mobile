@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'localization_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart'; 
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'device_helper.dart';
 import 'main.dart'; // Lấy cả themeNotifier và currentAppVersion từ đây
@@ -26,16 +26,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _themeMode = 'system';
   bool _isNotiEnabled = false;
   String _videoEncoder = 'hardware'; // Cài đặt mới cho HLS Encoder
-  String _lang = 'vi';
   
-  String _fwVersion = 'Đang tải...';
   bool _isCheckingUpdate = false; 
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
-    _fetchServerInfo();
   }
 
   Future<void> _loadSettings() async {
@@ -44,39 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _themeMode = prefs.getString('theme_mode') ?? 'system';
       _isNotiEnabled = prefs.getBool('push_enabled') ?? false;
       _videoEncoder = prefs.getString('video_encoder') ?? 'hardware'; // Load cấu hình encoder
-      _lang = prefs.getString('lang') ?? 'vi';
     });
-  }
-
-  Future<void> _changeLang(String lang) async {
-    setState(() => _lang = lang);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('lang', lang);
-    try {
-      final cookieManager = WebViewCookieManager();
-      await cookieManager.setCookie(
-        WebViewCookie(
-          name: 'lang',
-          value: lang,
-          domain: AppConfig.domain,
-          path: '/',
-        ),
-      );
-    } catch (e) {}
-  }
-
-  Future<void> _fetchServerInfo() async {
-    try {
-      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/system_info_api'));
-      final data = jsonDecode(res.body);
-      if (data['status'] == 'success') {
-        setState(() {
-          _fwVersion = data['firmware_version'];
-        });
-      }
-    } catch (e) {
-      setState(() { _fwVersion = 'Lỗi kết nối'; });
-    }
   }
 
   Future<void> _changeTheme(String mode) async {
@@ -101,7 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _toggleNotification(bool value) async {
-    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (c) => Center(child: CircularProgressIndicator()));
     setState(() => _isNotiEnabled = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('push_enabled', value);
@@ -159,14 +124,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (data['update_available'] == true) {
           final String newVersion = data['version'].toString();
           final String downloadUrl = data['download_url'].toString();
-          final String changelog = data['note'] ?? 'Bản cập nhật tối ưu hóa cho thiết bị của bạn.';
+          final String changelog = data['note'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Bản cập nhật tối ưu hóa cho thiết bị của bạn.' : 'Optimization update for your device.');
           final bool isForceUpdate = data['is_force_update'] == true;
           
           if (mounted) _showUpdateDialog(newVersion, changelog, downloadUrl, isForceUpdate);
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Bạn đang sử dụng phiên bản mới nhất!', style: TextStyle(color: Colors.white)),
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(LocalizationService().currentLanguage == 'vi' ? 'Bạn đang sử dụng phiên bản mới nhất!' : 'You are using the latest version!', style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.green,
             ));
           }
@@ -174,8 +139,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Không thể kết nối đến máy chủ cập nhật.'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(LocalizationService().currentLanguage == 'vi' ? 'Không thể kết nối đến máy chủ cập nhật.' : 'Cannot connect to the update server.'),
           backgroundColor: Colors.orange,
         ));
       }
@@ -201,8 +166,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: Row(
                   children: [
                     Icon(isForceUpdate ? Icons.warning_amber_rounded : Icons.system_update, color: isForceUpdate ? Colors.red : Colors.blue, size: 28),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text('Bản cập nhật v$newVersion', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+                    SizedBox(width: 10),
+                    Expanded(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Bản cập nhật v$newVersion' : 'Update v$newVersion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
                   ],
                 ),
                 content: Column(
@@ -210,9 +175,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (isForceUpdate) 
-                      const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Ứng dụng đã quá cũ và không còn được hỗ trợ. Bắt buộc phải cập nhật!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))),
-                    const Text('Có phiên bản mới với các thay đổi:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                    const SizedBox(height: 8),
+                      Padding(padding: EdgeInsets.only(bottom: 12), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Ứng dụng đã quá cũ và không còn được hỗ trợ. Bắt buộc phải cập nhật!' : 'The app is too old and no longer supported. Update required!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))),
+                    Text(LocalizationService().currentLanguage == 'vi' ? 'Có phiên bản mới với các thay đổi:' : 'New version available with changes:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                    SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       constraints: const BoxConstraints(maxHeight: 150),
@@ -221,19 +186,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: SingleChildScrollView(child: Text(changelog, style: const TextStyle(fontSize: 13, color: Colors.black87))),
                     ),
                     if (isDownloading) ...[
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
                       LinearProgressIndicator(value: progress, backgroundColor: Colors.grey.shade300, color: Colors.blue, minHeight: 8, borderRadius: BorderRadius.circular(10)),
-                      const SizedBox(height: 8),
-                      Center(child: Text('Đang tải: ${(progress * 100).toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))),
+                      SizedBox(height: 8),
+                      Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Đang tải: ${(progress * 100).toStringAsFixed(1)}%' : 'Downloading: ${(progress * 100).toStringAsFixed(1)}%', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))),
                     ]
                   ],
                 ),
                 actions: [
                   if (!isDownloading && !isForceUpdate)
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Để sau', style: TextStyle(color: Colors.grey))),
+                    TextButton(onPressed: () => Navigator.pop(context), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Để sau' : 'Later', style: TextStyle(color: Colors.grey))),
                   FilledButton.icon(
                     onPressed: isDownloading ? null : () async {
-                      await Permission.requestInstallPackages.request();
+                      if (Platform.isIOS) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Vui lòng cập nhật ứng dụng từ App Store / TestFlight.' : 'Please update the app from App Store / TestFlight.')));
+                        return;
+                      }
+                      if (Platform.isAndroid) {
+                        await Permission.requestInstallPackages.request();
+                      }
                       setPopupState(() { isDownloading = true; progress = 0.0; });
                       try {
                         Directory tempDir = await getTemporaryDirectory();
@@ -244,15 +215,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         });
 
                         if (!isForceUpdate && context.mounted) Navigator.pop(context);
-                        await OpenFilex.open(savePath);
+                        if (Platform.isAndroid) {
+                          await OpenFilex.open(savePath);
+                        }
                         if (isForceUpdate) setPopupState(() { isDownloading = false; progress = 1.0; });
                       } catch (e) {
                         setPopupState(() { isDownloading = false; });
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lỗi khi tải bản cập nhật!')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi khi tải bản cập nhật!' : 'Error downloading update!')));
                       }
                     },
-                    icon: isDownloading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.download, size: 18),
-                    label: Text(isDownloading ? 'Đang tải...' : 'Cập nhật ngay'),
+                    icon: isDownloading ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.download, size: 18),
+                    label: Text(isDownloading ? LocalizationService().currentLanguage == 'vi' ? 'Đang tải...' : 'Loading...' : LocalizationService().currentLanguage == 'vi' ? 'Cập nhật ngay' : 'Update now'),
                   ),
                 ],
               );
@@ -266,112 +239,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cài đặt hệ thống', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Cài đặt hệ thống' : 'System Settings', style: TextStyle(fontWeight: FontWeight.bold))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('GIAO DIỆN & HIỂN THỊ', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text(LocalizationService().currentLanguage == 'vi' ? 'GIAO DIỆN & HIỂN THỊ' : 'DISPLAY & INTERFACE', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
           Card(
-            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
             child: Column(
               children: [
-                RadioListTile(value: 'system', groupValue: _themeMode, title: const Text('Theo hệ thống'), secondary: const Icon(Icons.brightness_auto, color: Colors.blueGrey), onChanged: (v) => _changeTheme(v.toString())),
+                RadioListTile(value: 'system', groupValue: _themeMode, title: Text(LocalizationService().currentLanguage == 'vi' ? 'Theo hệ thống' : 'System Default'), secondary: Icon(Icons.brightness_auto, color: Colors.blueGrey), onChanged: (v) => _changeTheme(v.toString())),
                 const Divider(height: 1, indent: 60),
-                RadioListTile(value: 'light', groupValue: _themeMode, title: const Text('Giao diện Sáng'), secondary: const Icon(Icons.light_mode, color: Colors.orange), onChanged: (v) => _changeTheme(v.toString())),
+                RadioListTile(value: 'light', groupValue: _themeMode, title: Text(LocalizationService().currentLanguage == 'vi' ? 'Giao diện Sáng' : 'Light Mode'), secondary: Icon(Icons.light_mode, color: Colors.orange), onChanged: (v) => _changeTheme(v.toString())),
                 const Divider(height: 1, indent: 60),
-                RadioListTile(value: 'dark', groupValue: _themeMode, title: const Text('Giao diện Tối'), secondary: const Icon(Icons.dark_mode, color: Colors.deepPurple), onChanged: (v) => _changeTheme(v.toString())),
+                RadioListTile(value: 'dark', groupValue: _themeMode, title: Text(LocalizationService().currentLanguage == 'vi' ? 'Giao diện Tối' : 'Dark Mode'), secondary: Icon(Icons.dark_mode, color: Colors.deepPurple), onChanged: (v) => _changeTheme(v.toString())),
               ],
             ),
           ),
-          const SizedBox(height: 25),
+          
+          SizedBox(height: 25),
+          Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text(LocalizationService().currentLanguage == 'vi' ? 'NGÔN NGỮ (LANGUAGE)' : 'LANGUAGE', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Card(
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+            child: Column(
+              children: [
+                RadioListTile(value: 'vi', groupValue: LocalizationService().currentLanguage, title: Text('Tiếng Việt'), secondary: Text('🇻🇳', style: TextStyle(fontSize: 24)), onChanged: (v) {
+                  setState(() {});
+                  LocalizationService().setLanguage('vi');
+                }),
+                const Divider(height: 1, indent: 60),
+                RadioListTile(value: 'en', groupValue: LocalizationService().currentLanguage, title: Text('English (US)'), secondary: Text('🇺🇸', style: TextStyle(fontSize: 24)), onChanged: (v) {
+                  setState(() {});
+                  LocalizationService().setLanguage('en');
+                }),
+              ],
+            ),
+          ),
 
-          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('NGÔN NGỮ / LANGUAGE', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
-          Card(
-            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
-            child: Column(
-              children: [
-                RadioListTile(value: 'vi', groupValue: _lang, title: const Text('Tiếng Việt 🇻🇳'), onChanged: (v) => _changeLang(v.toString())),
-                const Divider(height: 1, indent: 60),
-                RadioListTile(value: 'en', groupValue: _lang, title: const Text('English 🇬🇧'), onChanged: (v) => _changeLang(v.toString())),
-              ],
-            ),
-          ),
-          const SizedBox(height: 25),
+          SizedBox(height: 25),
 
           // PHẦN MỚI BỔ SUNG CHO HLS ENCODER
-          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('BỘ MÃ HÓA VIDEO HLS (APP)', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text(LocalizationService().currentLanguage == 'vi' ? 'BỘ MÃ HÓA VIDEO HLS (APP)' : 'VIDEO HLS ENCODER (APP)', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
           Card(
-            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
             child: Column(
               children: [
                 RadioListTile(
                   value: 'hardware', 
                   groupValue: _videoEncoder, 
-                  title: const Text('Phần cứng (MediaCodec/VideoToolbox)'), 
-                  subtitle: const Text('Tốc độ nhanh, tiết kiệm pin, dùng chip GPU'),
-                  secondary: const Icon(Icons.memory, color: Colors.green), 
+                  title: Text(LocalizationService().currentLanguage == 'vi' ? 'Phần cứng (MediaCodec/VideoToolbox)' : 'Hardware (MediaCodec/VideoToolbox)'), 
+                  subtitle: Text(LocalizationService().currentLanguage == 'vi' ? 'Tốc độ nhanh, tiết kiệm pin, dùng chip GPU' : 'Fast, saves battery, uses GPU'),
+                  secondary: Icon(Icons.memory, color: Colors.green), 
                   onChanged: (v) => _changeEncoder(v.toString())
                 ),
                 const Divider(height: 1, indent: 60),
                 RadioListTile(
                   value: 'software', 
                   groupValue: _videoEncoder, 
-                  title: const Text('Phần mềm (libx264)'), 
-                  subtitle: const Text('Chậm hơn, dùng sức mạnh CPU, độ ổn định cao'),
-                  secondary: const Icon(Icons.developer_board, color: Colors.blueGrey), 
+                  title: Text(LocalizationService().currentLanguage == 'vi' ? 'Phần mềm (libx264)' : 'Software (libx264)'), 
+                  subtitle: Text(LocalizationService().currentLanguage == 'vi' ? 'Chậm hơn, dùng sức mạnh CPU, độ ổn định cao' : 'Slower, uses CPU, high stability'),
+                  secondary: Icon(Icons.developer_board, color: Colors.blueGrey), 
                   onChanged: (v) => _changeEncoder(v.toString())
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: 25),
 
-          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('TÙY CHỈNH THÔNG BÁO', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text(LocalizationService().currentLanguage == 'vi' ? 'TÙY CHỈNH THÔNG BÁO' : 'NOTIFICATION SETTINGS', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
           Card(
-            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
             child: SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              secondary: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _isNotiEnabled ? Colors.orange.withOpacity(0.1) : Colors.grey.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(_isNotiEnabled ? Icons.notifications_active : Icons.notifications_off, color: _isNotiEnabled ? Colors.orange : Colors.grey, size: 24)),
-              title: const Text('Nhận Thông báo', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Báo điểm trừ, tin nhắn cảnh báo AI'),
-              value: _isNotiEnabled, activeColor: Colors.orange, onChanged: _toggleNotification,
+              secondary: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _isNotiEnabled ? Colors.orange.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(_isNotiEnabled ? Icons.notifications_active : Icons.notifications_off, color: _isNotiEnabled ? Colors.orange : Colors.grey, size: 24)),
+              title: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhận Thông báo' : 'Receive Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(LocalizationService().currentLanguage == 'vi' ? 'Báo điểm trừ, tin nhắn cảnh báo AI' : 'Deduction alerts, AI warnings'),
+              value: _isNotiEnabled, activeThumbColor: Colors.orange, onChanged: _toggleNotification,
             ),
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: 25),
 
-          const Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text('THÔNG TIN PHẦN MỀM', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
+          Padding(padding: EdgeInsets.only(left: 8, bottom: 8), child: Text(LocalizationService().currentLanguage == 'vi' ? 'THÔNG TIN PHẦN MỀM' : 'SOFTWARE INFORMATION', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold))),
           Card(
-            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.2))),
+            elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.phone_android, color: Colors.blue),
-                  title: const Text('Phiên bản Ứng dụng (App)'),
-                  trailing: const Text('v$currentAppVersion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), 
-                ),
-                const Divider(height: 1, indent: 50),
-                ListTile(
-                  leading: const Icon(Icons.cloud_done, color: Colors.green),
-                  title: const Text('Phiên bản Firmware Server'),
-                  trailing: Text('v$_fwVersion', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  leading: Icon(Icons.phone_android, color: Colors.blue),
+                  title: Text(LocalizationService().currentLanguage == 'vi' ? 'Phiên bản Ứng dụng (App)' : 'App Version'),
+                  trailing: Text('v$currentAppVersion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), 
                 ),
                 const Divider(height: 1, indent: 50),
                 
                 ListTile(
-                  leading: const Icon(Icons.system_update_alt, color: Colors.orange),
-                  title: const Text('Kiểm tra phiên bản mới', style: TextStyle(fontWeight: FontWeight.w600)),
+                  leading: Icon(Icons.system_update_alt, color: Colors.orange),
+                  title: Text(LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra phiên bản mới' : 'Check for updates', style: TextStyle(fontWeight: FontWeight.w600)),
                   trailing: _isCheckingUpdate 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-                      : const Icon(Icons.chevron_right),
+                      ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                      : Icon(Icons.chevron_right),
                   onTap: _isCheckingUpdate ? null : _manualCheckUpdate,
                 ),
               ],
             ),
           ),
           
-          const SizedBox(height: 30),
-          Center(child: Text('Trường THPT Lạng Giang số 3 © 2026\nTập thể A1-K48', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade500, fontSize: 12))),
-          const SizedBox(height: 40),
+          SizedBox(height: 30),
+          Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Trường THPT Lạng Giang số 3 © 2026\nTập thể A1-K48' : 'Lang Giang No.3 High School © 2026\nA1-K48 Class', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade500, fontSize: 12))),
+          SizedBox(height: 40),
         ],
       ),
     );

@@ -1,5 +1,7 @@
+import 'localization_service.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,8 +21,23 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
   @override
   void initState() {
     super.initState();
-    DateTime start = DateTime(2025, 9, 5);
-    _week = ((DateTime.now().difference(start).inDays ~/ 7) + 1).toString();
+    _week = '1'; // Default, will be updated
+    _fetchCurrentWeek();
+  }
+
+  Future<void> _fetchCurrentWeek() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/ranking_api.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 'success' && data['current_week'] != null) {
+          if (mounted) setState(() => _week = data['current_week'].toString());
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching week: $e');
+    }
   }
 
   Future<void> _downloadExcel() async {
@@ -52,7 +69,7 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
           folderName = 'Download';
           filePath = '/storage/emulated/0/Download/LG3_VPBS_Tuan_$_week.xlsx';
         } else {
-          folderName = 'Tệp (Files)';
+          folderName = LocalizationService().currentLanguage == 'vi' ? 'Tệp (Files)' : 'Tep (Files)';
           final dir = await getApplicationDocumentsDirectory();
           filePath = '${dir.path}/LG3_VPBS_Tuan_$_week.xlsx';
         }
@@ -65,7 +82,7 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
           filePath = '${dir.path}/LG3_VPBS_Tuan_$_week.xlsx';
           File file = File(filePath);
           await file.writeAsBytes(response.bodyBytes);
-          folderName = 'Bộ nhớ App';
+          folderName = LocalizationService().currentLanguage == 'vi' ? 'Bộ nhớ App' : 'Bo nho App';
         }
 
         if (!mounted) return;
@@ -76,23 +93,23 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
             final isDarkDialog = Theme.of(context).brightness == Brightness.dark;
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Row(
+              title: Row(
                 children: [
                   Icon(Icons.check_circle, color: Colors.green, size: 28),
                   SizedBox(width: 10),
-                  Text('Tải Thành Công', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text(LocalizationService().currentLanguage == 'vi' ? 'Tải Thành Công' : 'Download successful', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ],
               ),
               content: RichText(
                 text: TextSpan(
                   style: TextStyle(color: isDarkDialog ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.5),
                   children: [
-                    const TextSpan(text: 'Báo cáo vi phạm đã được tải về máy của bạn.\n\n'),
-                    const TextSpan(text: 'Vị trí lưu: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: 'Thư mục $folderName\n'),
-                    const TextSpan(text: 'Tên file: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: LocalizationService().currentLanguage == 'vi' ? 'Báo cáo vi phạm đã được tải về máy của bạn.\n\n' : 'Bao cao vi pham da duoc tai ve may cua ban.\n\n'),
+                    TextSpan(text: LocalizationService().currentLanguage == 'vi' ? 'Vị trí lưu: ' : 'Vi tri luu: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: LocalizationService().currentLanguage == 'vi' ? 'Thư mục $folderName\n' : 'Thu muc $folderName\n'),
+                    TextSpan(text: LocalizationService().currentLanguage == 'vi' ? 'Tên file: ' : 'Ten file: ', style: TextStyle(fontWeight: FontWeight.bold)),
                     TextSpan(text: 'LG3_VPBS_Tuan_$_week.xlsx\n\n'),
-                    const TextSpan(text: 'Bạn có thể mở ứng dụng Quản lý tệp (File Manager) hoặc Zalo để gửi file này đi.'),
+                    TextSpan(text: LocalizationService().currentLanguage == 'vi' ? 'Bạn có thể mở ứng dụng Quản lý tệp (File Manager) hoặc Zalo để gửi file này đi.' : 'Ban co the mo ung dung Quan ly tep (File Manager) hoac Zalo de gui file nay di.'),
                   ],
                 ),
               ),
@@ -100,7 +117,7 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
                 FilledButton(
                   onPressed: () => Navigator.pop(c),
                   style: FilledButton.styleFrom(backgroundColor: Colors.green),
-                  child: const Text('Đã Hiểu', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(LocalizationService().currentLanguage == 'vi' ? 'Đã Hiểu' : 'Da Hieu', style: TextStyle(fontWeight: FontWeight.bold)),
                 )
               ],
             );
@@ -108,12 +125,12 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
         );
       } else {
         if (!mounted) return;
-        print("Lỗi định dạng trả về: $contentType");
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Lỗi xuất dữ liệu từ Server!'), backgroundColor: Colors.red));
+        print(LocalizationService().currentLanguage == 'vi' ? "Lỗi định dạng trả về: $contentType" : "Invalid response format: $contentType");
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi xuất dữ liệu từ Server!' : '❌ Error exporting data from Server!'), backgroundColor: Colors.red));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Lỗi kết nối: $e'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi kết nối: $e' : '❌ Connection error: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isDownloading = false);
     }
@@ -125,7 +142,7 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Xuất Báo Cáo', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xuất Báo Cáo' : 'Export Report', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -135,21 +152,21 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
             // Thẻ Hướng dẫn
             Card(
               elevation: 0,
-              color: isDark ? Colors.green.withOpacity(0.1) : Colors.green.shade50,
+              color: isDark ? Colors.green.withValues(alpha: 0.1) : Colors.green.shade50,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16), 
-                side: BorderSide(color: isDark ? Colors.green.withOpacity(0.3) : Colors.green.shade200)
+                side: BorderSide(color: isDark ? Colors.green.withValues(alpha: 0.3) : Colors.green.shade200)
               ),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(Icons.file_download, size: 50, color: Colors.green),
-                    const SizedBox(height: 10),
-                    const Text('Xuất dữ liệu Vi Phạm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
-                    const SizedBox(height: 8),
+                    Icon(Icons.file_download, size: 50, color: Colors.green),
+                    SizedBox(height: 10),
+                    Text(LocalizationService().currentLanguage == 'vi' ? 'Xuất dữ liệu Vi Phạm' : 'Export Violation Data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                    SizedBox(height: 8),
                     Text(
-                      'Hệ thống sẽ tải file Excel (.xlsx) trực tiếp vào thư mục Download trên điện thoại của bạn.', 
+                      LocalizationService().currentLanguage == 'vi' ? 'Hệ thống sẽ tải file Excel (.xlsx) trực tiếp vào thư mục Download trên điện thoại của bạn.' : 'The system will download the Excel (.xlsx) file directly to your phone\'s Download folder.', 
                       textAlign: TextAlign.center, 
                       style: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54)
                     ),
@@ -158,11 +175,11 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
               ),
             ),
             
-            const SizedBox(height: 30),
+            SizedBox(height: 30),
             
             // Khu vực chọn tuần
-            const Text('Chọn tuần cần xuất báo cáo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 10),
+            Text(LocalizationService().currentLanguage == 'vi' ? 'Chọn tuần cần xuất báo cáo:' : 'Select week to export:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
@@ -174,9 +191,9 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
                 child: DropdownButton<String>(
                   isExpanded: true,
                   value: _week,
-                  icon: const Icon(Icons.calendar_month, color: Colors.green),
+                  icon: Icon(Icons.calendar_month, color: Colors.green),
                   style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  items: List.generate(35, (i) => DropdownMenuItem(value: (i+1).toString(), child: Text('Tuần ${i+1}'))),
+                  items: List.generate(52, (i) => DropdownMenuItem(value: (i+1).toString(), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tuần ${i+1}' : 'Week ${i+1}'))),
                   onChanged: (v) { setState(() => _week = v!); },
                 ),
               ),
@@ -194,11 +211,11 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               icon: _isDownloading 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                  : const Icon(Icons.download_rounded),
-              label: Text(_isDownloading ? 'ĐANG TẢI XUỐNG...' : 'TẢI FILE EXCEL', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                  : Icon(Icons.download_rounded),
+              label: Text(_isDownloading ? LocalizationService().currentLanguage == 'vi' ? 'ĐANG TẢI XUỐNG...' : 'DOWNLOADING...' : 'TẢI FILE EXCEL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
           ],
         ),
       ),

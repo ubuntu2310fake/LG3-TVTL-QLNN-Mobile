@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -21,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_usernameCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng nhập đủ thông tin!')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Vui lòng nhập đủ thông tin!' : 'Please enter all information!')));
       return;
     }
 
@@ -58,19 +59,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell()));
             } else {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? 'Đăng nhập thất bại.', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Đăng nhập thất bại.' : 'Login failed.'), style: TextStyle(color: Colors.white)), backgroundColor: Colors.red));
             }
         } catch (e) {
             // Lỗi khi server trả về HTML thay vì JSON (thường do lỗi code PHP)
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Máy chủ trả về dữ liệu không hợp lệ.'), backgroundColor: Colors.orange));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Máy chủ trả về dữ liệu không hợp lệ.' : 'The server returned invalid data.'), backgroundColor: Colors.orange));
         }
       } else {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi máy chủ: ${response.statusCode}'), backgroundColor: Colors.red));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi máy chủ: ${response.statusCode}' : 'Server error: ${response.statusCode}'), backgroundColor: Colors.red));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Lỗi kết nối đến máy chủ LG3!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi kết nối đến máy chủ LG3!' : '❌ Error connecting to LG3 server!'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -97,30 +98,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, shape: BoxShape.circle),
                     child: Icon(Icons.shield_rounded, size: 40, color: Theme.of(context).colorScheme.primary),
                   ),
-                  const SizedBox(height: 20),
-                  Text('Hệ Thống Nền Nếp', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
-                  const SizedBox(height: 8),
-                  Text('Trường THPT Lạng Giang số 3', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600)),
+                  SizedBox(height: 20),
+                  Text(LocalizationService().currentLanguage == 'vi' ? 'Siêu ứng dụng LG3' : 'LG3 Super App', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  SizedBox(height: 8),
+                  Text(LocalizationService().currentLanguage == 'vi' ? 'Trường THPT Lạng Giang số 3' : 'Lang Giang High School No. 3', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600)),
                   
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32),
                   
                   // Form nhập liệu
                   TextField(
                     controller: _usernameCtrl,
                     decoration: InputDecoration(
-                      labelText: 'Tài khoản (GV hoặc Mã HS)',
-                      prefixIcon: const Icon(Icons.person_outline),
+                      labelText: LocalizationService().currentLanguage == 'vi' ? 'Tài khoản (GV hoặc Mã HS)' : 'Account (GV or HS Code)',
+                      prefixIcon: Icon(Icons.person_outline),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       filled: true, fillColor: Theme.of(context).colorScheme.surface,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   TextField(
                     controller: _passwordCtrl,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Mật khẩu',
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      labelText: LocalizationService().currentLanguage == 'vi' ? 'Mật khẩu' : 'Password',
+                      prefixIcon: Icon(Icons.lock_outline),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       filled: true, fillColor: Theme.of(context).colorScheme.surface,
                       suffixIcon: IconButton(
@@ -130,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   
                   // Checkbox Nhớ đăng nhập
                   Row(
@@ -140,11 +141,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         activeColor: Theme.of(context).colorScheme.primary,
                         onChanged: (val) => setState(() => _rememberMe = val ?? true),
                       ),
-                      const Text('Giữ trạng thái đăng nhập', style: TextStyle(fontWeight: FontWeight.w500)),
+                      Text(LocalizationService().currentLanguage == 'vi' ? 'Giữ trạng thái đăng nhập' : 'Stay logged in', style: TextStyle(fontWeight: FontWeight.w500)),
                     ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   
                   // Nút Đăng nhập
                   SizedBox(
@@ -153,8 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                       onPressed: _isLoading ? null : _handleLogin,
                       child: _isLoading
-                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('ĐĂNG NHẬP', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                          ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text(LocalizationService().currentLanguage == 'vi' ? 'ĐĂNG NHẬP' : 'LOG IN', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   ),
                 ],

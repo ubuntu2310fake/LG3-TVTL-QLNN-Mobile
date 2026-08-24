@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'localization_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
@@ -74,7 +75,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, 
       body: jsonEncode({'action': action, 'id': _student['id']})
     );
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã xử lý yêu cầu!'), backgroundColor: Colors.green));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã xử lý yêu cầu!' : '✅ Request processed!'), backgroundColor: Colors.green));
     _fetchData(); // Tải lại data mới
   }
 
@@ -106,11 +107,11 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
       
       if (data['status'] == 'success') {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ ${data['msg']}'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ ${data['msg']}' : '✅ ${data['msg']}'), backgroundColor: Colors.green));
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Lỗi kết nối!'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi kết nối!' : '❌ Connection error!'), backgroundColor: Colors.red));
     } finally {
       setState(() => _isSaving = false);
     }
@@ -118,12 +119,12 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_isLoading) return Scaffold(body: Center(child: CircularProgressIndicator()));
     bool hasPending = _student['has_pending_changes'] == 1;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Hồ Sơ Học Sinh', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Hồ Sơ Học Sinh' : 'Student Profile', style: TextStyle(fontWeight: FontWeight.bold))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -133,22 +134,22 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
               Container(
                 padding: const EdgeInsets.all(16), margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.orange.withOpacity(0.1) : Colors.orange.shade50, 
+                  color: isDark ? Colors.orange.withValues(alpha: 0.1) : Colors.orange.shade50, 
                   borderRadius: BorderRadius.circular(12), 
-                  border: Border.all(color: isDark ? Colors.orange.withOpacity(0.3) : Colors.orange.shade300)
+                  border: Border.all(color: isDark ? Colors.orange.withValues(alpha: 0.3) : Colors.orange.shade300)
                 ), 
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(children: [Icon(Icons.warning_amber, color: Colors.orange), SizedBox(width: 8), Text("Yêu cầu thay đổi", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange))]),
-                    const SizedBox(height: 10),
-                    Text("Tên mới: ${_student['pending_name'] ?? '---'}\nNgày sinh mới: ${_student['pending_dob'] ?? '---'}"),
-                    const SizedBox(height: 10),
+                    Row(children: [Icon(Icons.warning_amber, color: Colors.orange), SizedBox(width: 8), Text(LocalizationService().currentLanguage == 'vi' ? "Yêu cầu thay đổi" : "Change Request", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange))]),
+                    SizedBox(height: 10),
+                    Text(LocalizationService().currentLanguage == 'vi' ? "Tên mới: ${_student['pending_name'] ?? '---'}\nNgày sinh mới: ${_student['pending_dob'] ?? '---'}" : "New name: ${_student['pending_name'] ?? '---'}\nNew DOB: ${_student['pending_dob'] ?? '---'}"),
+                    SizedBox(height: 10),
                     Row(
                       children: [
-                        Expanded(child: ElevatedButton.icon(onPressed: () => _handlePending('approve_changes'), icon: const Icon(Icons.check), label: const Text('Duyệt'), style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white))),
-                        const SizedBox(width: 10),
-                        Expanded(child: OutlinedButton.icon(onPressed: () => _handlePending('reject_changes'), icon: const Icon(Icons.close), label: const Text('Từ chối'), style: OutlinedButton.styleFrom(foregroundColor: Colors.red))),
+                        Expanded(child: ElevatedButton.icon(onPressed: () => _handlePending('approve_changes'), icon: Icon(Icons.check), label: Text(LocalizationService().currentLanguage == 'vi' ? 'Duyệt' : 'Approve'), style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white))),
+                        SizedBox(width: 10),
+                        Expanded(child: OutlinedButton.icon(onPressed: () => _handlePending('reject_changes'), icon: Icon(Icons.close), label: Text(LocalizationService().currentLanguage == 'vi' ? 'Từ chối' : 'Reject'), style: OutlinedButton.styleFrom(foregroundColor: Colors.red))),
                       ],
                     )
                   ],
@@ -176,45 +177,45 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
               ),
             ),
             if ((_currentImageUrl != null || _newImageFile != null) && !_deleteImage)
-              TextButton.icon(onPressed: () => setState(() { _deleteImage = true; _newImageFile = null; }), icon: const Icon(Icons.delete, color: Colors.red, size: 18), label: const Text('Xóa ảnh', style: TextStyle(color: Colors.red))),
+              TextButton.icon(onPressed: () => setState(() { _deleteImage = true; _newImageFile = null; }), icon: Icon(Icons.delete, color: Colors.red, size: 18), label: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa ảnh' : 'Delete Image', style: TextStyle(color: Colors.red))),
             
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
-            TextField(controller: TextEditingController(text: _student['code']), decoration: InputDecoration(labelText: 'Mã HS (SBD)', border: const OutlineInputBorder(), filled: true, fillColor: isDark ? Colors.grey[800] : const Color(0xFFF5F5F5)), readOnly: true), const SizedBox(height: 15),
-            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Họ và tên', border: OutlineInputBorder())), const SizedBox(height: 15),
-            TextField(controller: _dobCtrl, decoration: const InputDecoration(labelText: 'Ngày sinh (DD/MM/YYYY)', border: OutlineInputBorder())), const SizedBox(height: 15),
+            TextField(controller: TextEditingController(text: _student['code']), decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Mã HS (SBD)' : 'Student Code (ID)', border: OutlineInputBorder(), filled: true, fillColor: isDark ? Colors.grey[800] : Color(0xFFF5F5F5)), readOnly: true), SizedBox(height: 15),
+            TextField(controller: _nameCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Họ và tên' : 'Full Name', border: OutlineInputBorder())), SizedBox(height: 15),
+            TextField(controller: _dobCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Ngày sinh (DD/MM/YYYY)' : 'Date of Birth (DD/MM/YYYY)', border: OutlineInputBorder())), SizedBox(height: 15),
             DropdownButtonFormField<int>(
-              decoration: const InputDecoration(labelText: 'Lớp học', border: OutlineInputBorder()),
-              value: _classId, items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
+              decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Lớp học' : 'Class', border: OutlineInputBorder()),
+              initialValue: _classId, items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
               onChanged: (v) => setState(() => _classId = v),
             ),
             
             const Divider(height: 40),
             
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'Quyền hạn (User)', border: OutlineInputBorder()),
-              value: _userRole, 
-              items: const [
-                DropdownMenuItem(value: 'STUDENT', child: Text('Học sinh')),
-                DropdownMenuItem(value: 'RED_FLAG', child: Text('Cờ đỏ / Lớp trưởng (Được chấm điểm)')),
+              decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Quyền hạn (User)' : 'Role (User)', border: OutlineInputBorder()),
+              initialValue: _userRole, 
+              items: [
+                DropdownMenuItem(value: 'STUDENT', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Học sinh' : 'Students')),
+                DropdownMenuItem(value: 'RED_FLAG', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Cờ đỏ / Lớp trưởng (Được chấm điểm)' : 'Red Flag / Monitor (Can Grade)')),
               ],
               onChanged: (v) => setState(() { _userRole = v!; if (v != 'RED_FLAG') _standingClassId = null; }),
             ),
-            const SizedBox(height: 15),
+            SizedBox(height: 15),
             
             if (_userRole == 'RED_FLAG')
               DropdownButtonFormField<int>(
-                decoration: const InputDecoration(labelText: 'Đứng lớp (Chỉ dành cho Cờ đỏ)', border: OutlineInputBorder()),
-                value: _standingClassId, 
-                items: [const DropdownMenuItem<int>(value: null, child: Text('-- Không đứng lớp --'))]..addAll(_classes.map((c) => DropdownMenuItem<int>(value: c['id'], child: Text('Lớp ${c['name']}')))),
+                decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Đứng lớp (Chỉ dành cho Cờ đỏ)' : 'Assigned Class (For Red Flag Only)', border: OutlineInputBorder()),
+                initialValue: _standingClassId, 
+                items: [DropdownMenuItem<int>(value: null, child: Text(LocalizationService().currentLanguage == 'vi' ? '-- Không đứng lớp --' : '-- Not assigned --')), ..._classes.map((c) => DropdownMenuItem<int>(value: c['id'], child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lớp ${c["name"]}' : 'Class ${c["name"]}')))],
                 onChanged: (v) => setState(() => _standingClassId = v),
               ),
 
-            const SizedBox(height: 30),
+            SizedBox(height: 30),
             ElevatedButton(
               onPressed: _isSaving ? null : _save, 
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15), backgroundColor: Colors.blue, foregroundColor: Colors.white), 
-              child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('LƯU THAY ĐỔI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+              child: _isSaving ? CircularProgressIndicator(color: Colors.white) : Text(LocalizationService().currentLanguage == 'vi' ? 'LƯU THAY ĐỔI' : 'SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
             ),
           ],
         ),

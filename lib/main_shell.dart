@@ -1,18 +1,24 @@
+import 'dart:io';
+import 'offline_sync.dart';
 import 'dart:convert';
+
 import 'dart:io';
 import 'dart:ui'; 
 import 'dart:async'; 
 import 'package:flutter/material.dart';
+import 'localization_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart'; 
-
+import 'package:path_provider/path_provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'login_screen.dart';
+import 'sse_service.dart';
+import 'widgets/liquid_glass_container.dart';
 import 'home_screen.dart';
 import 'gate_check_screen.dart';
 import 'class_check_screen.dart';
@@ -29,7 +35,8 @@ import 'manage_students_screen.dart';
 import 'manage_users_screen.dart';
 import 'banned_ips_screen.dart';
 import 'traffic_monitor_screen.dart';
-import 'news_screen.dart';
+import 'chess_lobby_screen.dart';
+import 'news_screen.dart' hide AppConfig;
 
 import 'exam_lookup_screen.dart';
 import 'manage_exams_screen.dart';
@@ -91,6 +98,14 @@ class _MarqueeWidgetState extends State<MarqueeWidget> {
     super.dispose();
   }
 
+  
+  String _getInitialLetter(String name) {
+    if (name.isEmpty) return 'U';
+    List<String> parts = name.trim().split(RegExp(r'\s+'));
+    String last = parts.last;
+    return last.isNotEmpty ? last[0].toUpperCase() : name[0].toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -137,10 +152,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
   
   int _currentIndex = 0;
-  String _userName = 'Đang tải...';
+  String _userName = LocalizationService().currentLanguage == 'vi' ? 'Đang tải...' : 'Loading...';
   String _role = 'STUDENT';
   String _avatar = '${AppConfig.baseUrl}/static/default.png';
+  String _localAvatarPath = '';
   String _tickerText = ''; // BIẾN LƯU NỘI DUNG TICKER
+  bool _isOfflineMode = false;
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
 
   final ValueNotifier<List<Map<String, dynamic>>> _notificationsNotifier = ValueNotifier([]);
 
@@ -165,12 +183,38 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _notiTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       _loadNotifications(isInit: false);
     });
+
+    // Khởi động SSE Stream để nhận thông báo thời gian thực ngay trên app
+    SseService().start(onNotification: (title, body, notiId, data) {
+      if (mounted) {
+        _showInAppNotification(title, body, notiId, data);
+        _loadNotifications(isInit: false);
+      }
+    });
+
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
+      bool isOffline = !result.contains(ConnectivityResult.wifi) && !result.contains(ConnectivityResult.mobile) && !result.contains(ConnectivityResult.ethernet);
+      if (mounted && _isOfflineMode != isOffline) {
+        setState(() { _isOfflineMode = isOffline; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isOffline ? LocalizationService().currentLanguage == 'vi' ? 'Đã mất kết nối mạng. Chuyển sang chế độ ngoại tuyến.' : 'Network disconnected. Switched to offline mode.' : LocalizationService().currentLanguage == 'vi' ? 'Đã khôi phục kết nối mạng.' : 'Network connection restored.'),
+          backgroundColor: isOffline ? Colors.red : Colors.green,
+          duration: const Duration(seconds: 3),
+        ));
+      }
+    });
+    Connectivity().checkConnectivity().then((result) {
+      bool isOffline = !result.contains(ConnectivityResult.wifi) && !result.contains(ConnectivityResult.mobile) && !result.contains(ConnectivityResult.ethernet);
+      if (mounted) setState(() { _isOfflineMode = isOffline; });
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    SseService().stop();
     _notiTimer?.cancel(); 
+    _connectivitySubscription.cancel();
     super.dispose();
   }
 
@@ -193,17 +237,33 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      debugPrint("Lỗi tải Ticker: $e");
+      debugPrint(LocalizationService().currentLanguage == 'vi' ? "Lỗi tải Ticker: $e" : "Error loading Ticker: $e");
     }
   }
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userName = prefs.getString('full_name') ?? 'Người dùng';
+      _userName = prefs.getString('full_name') ?? (LocalizationService().currentLanguage == 'vi' ? 'Người dùng' : 'User');
       _role = prefs.getString('role') ?? 'STUDENT';
       _avatar = prefs.getString('avatar') ?? '${AppConfig.baseUrl}/static/default.png';
+      _localAvatarPath = prefs.getString('local_avatar_path') ?? '';
     });
+    
+    // Asynchronously sync avatar and master data
+    try {
+      final sessionId = prefs.getString('phpsessid') ?? '';
+      if (sessionId.isNotEmpty) {
+        await OfflineSyncService.syncUserAvatar(sessionId);
+        if (mounted) {
+          setState(() {
+            _avatar = prefs.getString('avatar') ?? _avatar;
+            _localAvatarPath = prefs.getString('local_avatar_path') ?? '';
+            _userName = prefs.getString('full_name') ?? _userName;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkUpdate() async {
@@ -223,7 +283,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       
       if (response.statusCode == 200 && response.data['update_available'] == true) {
         final data = response.data;
-        if (mounted) _showUpdateDialog(data['version'].toString(), data['note'] ?? 'Bản cập nhật tối ưu hóa', data['download_url'].toString(), data['is_force_update'] == true);
+        if (mounted) _showUpdateDialog(data['version'].toString(), data['note'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Bản cập nhật tối ưu hóa' : 'Optimization update'), data['download_url'].toString(), data['is_force_update'] == true);
       }
     } catch (e) {}
   }
@@ -240,34 +300,42 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             builder: (context, setPopupState) {
               return AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: Row(children: [Icon(isForceUpdate ? Icons.warning_amber_rounded : Icons.system_update, color: isForceUpdate ? Colors.red : Colors.blue, size: 28), const SizedBox(width: 10), Expanded(child: Text('Bản cập nhật v$newVersion', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 18)))]),
+                title: Row(children: [Icon(isForceUpdate ? Icons.warning_amber_rounded : Icons.system_update, color: isForceUpdate ? Colors.red : Colors.blue, size: 28), SizedBox(width: 10), Expanded(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Bản cập nhật v$newVersion' : 'Update v$newVersion', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 18)))]),
                 content: Column(
                   mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isForceUpdate) const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Bắt buộc phải cập nhật để tiếp tục sử dụng!', style: TextStyle(fontFamily: 'Inter', color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))),
-                    const Text('Thay đổi:', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blueGrey)), const SizedBox(height: 8),
-                    Container(width: double.infinity, constraints: const BoxConstraints(maxHeight: 150), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)), child: SingleChildScrollView(child: Text(changelog, style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)))),
-                    if (isDownloading) ...[const SizedBox(height: 20), LinearProgressIndicator(value: progress, backgroundColor: Colors.grey.shade300, color: Colors.blue, minHeight: 8, borderRadius: BorderRadius.circular(10)), const SizedBox(height: 8), Center(child: Text('Đang tải: ${(progress * 100).toStringAsFixed(1)}%', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blue)))]
+                    if (isForceUpdate) Padding(padding: EdgeInsets.only(bottom: 12), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Bắt buộc phải cập nhật để tiếp tục sử dụng!' : 'Update required to continue!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14))),
+                    Text(LocalizationService().currentLanguage == 'vi' ? 'Thay đổi:' : 'Changelog:', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blueGrey)), SizedBox(height: 8),
+                    Container(width: double.infinity, constraints: const BoxConstraints(maxHeight: 150), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300)), child: SingleChildScrollView(child: Text(changelog, style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)))),
+                    if (isDownloading) ...[SizedBox(height: 20), LinearProgressIndicator(value: progress, backgroundColor: Colors.grey.shade300, color: Colors.blue, minHeight: 8, borderRadius: BorderRadius.circular(10)), SizedBox(height: 8), Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Đang tải: ${(progress * 100).toStringAsFixed(1)}%' : 'Downloading: ${(progress * 100).toStringAsFixed(1)}%', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, color: Colors.blue)))]
                   ],
                 ),
                 actions: [
                   if (!isDownloading && !isForceUpdate) 
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Để sau', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey))),
+                    TextButton(onPressed: () => Navigator.pop(context), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Để sau' : 'Later', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey))),
                   FilledButton.icon(
                     onPressed: isDownloading ? null : () async {
-                      await Permission.requestInstallPackages.request();
+                      if (Platform.isIOS) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Vui lòng cập nhật ứng dụng từ App Store / TestFlight.' : 'Please update the app from App Store / TestFlight.')));
+                        return;
+                      }
+                      if (Platform.isAndroid) {
+                        await Permission.requestInstallPackages.request();
+                      }
                       setPopupState(() { isDownloading = true; progress = 0.0; });
                       try {
                         Directory tempDir = await getTemporaryDirectory(); String savePath = "${tempDir.path}/LG3_v$newVersion.apk";
                         await Dio().download(downloadUrl, savePath, onReceiveProgress: (rcv, total) { if (total != -1) setPopupState(() { progress = rcv / total; }); });
                         if (!isForceUpdate && context.mounted) Navigator.pop(context); 
-                        await OpenFilex.open(savePath);
+                        if (Platform.isAndroid) {
+                          await OpenFilex.open(savePath);
+                        }
                         if (isForceUpdate) setPopupState(() { isDownloading = false; progress = 1.0; });
                       } catch (e) {
-                        setPopupState(() { isDownloading = false; }); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lỗi tải bản cập nhật!')));
+                        setPopupState(() { isDownloading = false; }); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi tải bản cập nhật!' : 'Failed to download update!')));
                       }
                     },
-                    icon: isDownloading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.download, size: 18), label: Text(isDownloading ? 'Đang tải...' : 'Cập nhật ngay', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)),
+                    icon: isDownloading ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.download, size: 18), label: Text(isDownloading ? LocalizationService().currentLanguage == 'vi' ? 'Đang tải...' : 'Loading...' : LocalizationService().currentLanguage == 'vi' ? 'Cập nhật ngay' : 'Update now', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)),
                   ),
                 ],
               );
@@ -362,13 +430,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   onTap: () { entry.remove(); _markIdAsRead(notiId); _handleNotificationClick(data); },
                   child: Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16), boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 15, offset: Offset(0, 5))], border: Border.all(color: isDark ? Colors.blue.shade900 : Colors.blue.shade200, width: 1.5)),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 15, offset: Offset(0, 5))], border: Border.all(color: isDark ? Colors.blue.shade900 : Colors.blue.shade200, width: 1.5)),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50, shape: BoxShape.circle), child: const Icon(Icons.notifications_active, color: Colors.blue)),
-                        const SizedBox(width: 12),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [Text(title, style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)), const SizedBox(height: 4), Text(body, style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54), maxLines: 2, overflow: TextOverflow.ellipsis)])),
+                        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: isDark ? Colors.blue.withValues(alpha: 0.1) : Colors.blue.shade50, shape: BoxShape.circle), child: Icon(Icons.notifications_active, color: Colors.blue)),
+                        SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [Text(title, style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : Colors.black87)), SizedBox(height: 4), Text(body, style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54), maxLines: 2, overflow: TextOverflow.ellipsis)])),
                       ],
                     ),
                   ),
@@ -383,10 +451,52 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _handleNotificationClick(Map<String, dynamic> data) {
-    if (data.containsKey('url')) {
-      final url = data['url'].toString();
-      if (url.contains('gate_check') && _isStaff) { setState(() => _currentIndex = 1); } 
-      else if ((url.contains('class_check') || url.contains('teacher_dashboard')) && _isStaff) { setState(() => _currentIndex = 2); } 
+    final url = (data['url'] ?? '').toString();
+    final action = (data['action'] ?? '').toString();
+
+    // 1. Vi phạm của tôi (Chính học sinh bị trừ điểm)
+    if (action == 'open_student_violations' || url.contains('student_violations')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()));
+    }
+    // 2. Lớp của tôi (GVCN / Học sinh cùng lớp / Cảnh báo tâm lý gửi GVCN)
+    else if (action == 'open_my_class' || url.contains('teacher_dashboard') || url.contains('my_class')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
+    }
+    // 3. Lịch sử vi phạm (GV không chủ nhiệm / Admin)
+    else if (action == 'open_violation_history' || url.contains('violation_history')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen()));
+    }
+    // 4. Trực cổng / Kiểm tra cổng
+    else if (action == 'open_gate_check' || url.contains('gate_check')) {
+      if (_isStaff) {
+        setState(() => _currentIndex = 1);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const GateCheckScreen()));
+      }
+    }
+    // 5. Kiểm tra lớp
+    else if (action == 'open_class_check' || url.contains('class_check')) {
+      if (_isStaff) {
+        setState(() => _currentIndex = 2);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassCheckScreen()));
+      }
+    }
+    // 6. Chat tư vấn tâm lý / Bạn bè
+    else if (action == 'open_chat' || url.contains('consulting_dashboard') || url.contains('chat')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const HumanChatListScreen()));
+    }
+    // 7. Lời mời kết bạn / Trang cá nhân
+    else if (action == 'open_friends' || url.contains('friends') || url.contains('my_profile')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    }
+    // 8. Tra cứu điểm thi
+    else if (action == 'open_exam_scores' || url.contains('exam') || url.contains('tracuudiemthi')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamLookupScreen()));
+    }
+    // 9. Cảnh báo tâm lý fallback
+    else if (action == 'open_psychology_alert') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
     }
   }
 
@@ -407,22 +517,22 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Thông báo', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 20, fontWeight: FontWeight.bold)), if (unreadCount > 0) TextButton(onPressed: () { _notificationsNotifier.value = notifs.map((n) => {...n, 'isRead': true}).toList(); _saveNotifications(); }, child: const Text('Đánh dấu đã đọc tất cả', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)))])
+                    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(LocalizationService().currentLanguage == 'vi' ? 'Thông báo' : 'Notifications', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 20, fontWeight: FontWeight.bold)), if (unreadCount > 0) TextButton(onPressed: () { _notificationsNotifier.value = notifs.map((n) => {...n, 'isRead': true}).toList(); _saveNotifications(); }, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Đánh dấu đã đọc tất cả' : 'Mark all as read', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)))])
                   ),
                   const Divider(height: 1),
                   Expanded(
                     child: notifs.isEmpty
-                        ? const Center(child: Text('Không có thông báo nào', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey)))
+                        ? Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Không có thông báo nào' : 'No notifications', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey)))
                         : ListView.builder(
                             itemCount: notifs.length,
                             itemBuilder: (context, index) {
                               final n = notifs[index]; final isRead = n['isRead'] == true; final dt = DateTime.parse(n['time']); final timeStr = "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} ${dt.day}/${dt.month}";
                               return Container(
-                                color: isRead ? Colors.transparent : (isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.withOpacity(0.05)),
+                                color: isRead ? Colors.transparent : (isDark ? Colors.blue.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.05)),
                                 child: ListTile(
                                   leading: CircleAvatar(backgroundColor: isRead ? (isDark ? Colors.grey[800] : Colors.grey.shade200) : (isDark ? Colors.blue.shade900 : Colors.blue.shade100), child: Icon(Icons.notifications, color: isRead ? Colors.grey : Colors.blue)),
-                                  title: Text(n['title'], style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
-                                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const SizedBox(height: 4), Text(n['body'], style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), const SizedBox(height: 4), Text(timeStr, style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 11, color: isDark ? Colors.blueGrey.shade300 : Colors.blueGrey.shade400))]),
+                                  title: Text(n['title'], style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
+                                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(height: 4), Text(n['body'], style: const TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), SizedBox(height: 4), Text(timeStr, style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 11, color: isDark ? Colors.blueGrey.shade300 : Colors.blueGrey.shade400))]),
                                   onTap: () { if (!isRead) { _markIdAsRead(n['id'].toString()); } Navigator.pop(context); _handleNotificationClick(n['data'] ?? {}); },
                                   onLongPress: () { List<Map<String, dynamic>> updatedList = List.from(notifs); updatedList.removeAt(index); _notificationsNotifier.value = updatedList; _saveNotifications(); },
                                 ),
@@ -430,7 +540,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             },
                           ),
                   ),
-                  if (notifs.isNotEmpty) TextButton(onPressed: () { _notificationsNotifier.value = []; _saveNotifications(); }, child: const Text('Xóa tất cả', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.red))), const SizedBox(height: 10),
+                  if (notifs.isNotEmpty) TextButton(onPressed: () { _notificationsNotifier.value = []; _saveNotifications(); }, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa tất cả' : 'Clear all', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.red))), SizedBox(height: 10),
                 ],
               ),
             );
@@ -441,7 +551,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   Future<void> _logout() async {
-    final confirm = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: const Text('Xác nhận', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing))), TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Đăng xuất', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.red)))]));
+    final confirm = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận' : 'Confirm', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), content: Text(LocalizationService().currentLanguage == 'vi' ? 'Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?' : 'Are you sure you want to log out from this device?', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing))), TextButton(onPressed: () => Navigator.pop(context, true), child: Text(T('logout', def: LocalizationService().currentLanguage == 'vi' ? 'Đăng xuất' : 'Logout'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.red)))]));
     if (confirm != true) return;
     try { final prefs = await SharedPreferences.getInstance(); await http.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}); } catch (e) {}
     final prefs = await SharedPreferences.getInstance(); await prefs.clear();
@@ -451,17 +561,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Widget _buildBody() {
     if (_isStaff) {
       switch (_currentIndex) {
-        case 0: return HomeScreen(onNavigate: (index) { setState(() { _currentIndex = index; }); });
+        case 0: return HomeScreen(onNavigate: (index) { setState(() { _currentIndex = index; }); }, isOffline: _isOfflineMode);
         case 1: return const GateCheckScreen();
         case 2: return const ClassCheckScreen();
-        default: return const Center(child: Text('Không tìm thấy trang', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)));
+        default: return Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Không tìm thấy trang' : 'Page not found', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)));
       }
     } else {
       switch (_currentIndex) {
-        case 0: return HomeScreen(onNavigate: (index) { setState(() { _currentIndex = index; }); });
+        case 0: return HomeScreen(onNavigate: (index) { setState(() { _currentIndex = index; }); }, isOffline: _isOfflineMode);
         case 1: return const AiConsultingScreen(); 
         case 2: return const RankingScreen();      
-        default: return const Center(child: Text('Không tìm thấy trang', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)));
+        default: return Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Không tìm thấy trang' : 'Page not found', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)));
       }
     }
   }
@@ -469,14 +579,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   String _getAppBarTitle() {
     if (_isStaff) {
       switch (_currentIndex) {
-        case 0: return 'LG3-TVTL-QLNN';
-        case 1: return 'KIỂM TRA CỔNG';
-        case 2: return 'KIỂM TRA LỚP';
+        case 0: return LocalizationService().currentLanguage == 'vi' ? 'Siêu ứng dụng LG3' : 'LG3 Super App';
+        case 1: return LocalizationService().currentLanguage == 'vi' ? 'KIỂM TRA CỔNG' : 'GATE CHECK';
+        case 2: return LocalizationService().currentLanguage == 'vi' ? 'KIỂM TRA LỚP' : 'CLASS CHECK';
         default: return 'LG3';
       }
     } else {
       switch (_currentIndex) {
-        case 0: return 'LG3-TVTL-QLNN';
+        case 0: return LocalizationService().currentLanguage == 'vi' ? 'Siêu ứng dụng LG3' : 'LG3 Super App';
         case 1: return 'CHUYÊN GIA AI';
         case 2: return 'BẢNG XẾP HẠNG';
         default: return 'LG3';
@@ -484,30 +594,28 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
+  
+  String _getInitialLetter(String name) {
+    if (name.isEmpty) return 'U';
+    List<String> parts = name.trim().split(RegExp(r'\s+'));
+    String last = parts.last;
+    return last.isNotEmpty ? last[0].toUpperCase() : name[0].toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
+      extendBodyBehindAppBar: false,
+      extendBody: false,
       appBar: AppBar(
-        title: Text(_getAppBarTitle(), style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w900, fontSize: 18)),
+        title: Text(_getAppBarTitle(), style: const TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w900, fontSize: 18)),
         centerTitle: true, elevation: 0, scrolledUnderElevation: 2,
+        backgroundColor: null,
+        surfaceTintColor: Colors.transparent, // CRITICAL FIX for Material 3 opaque bug
+        flexibleSpace: null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.language),
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              String currentLang = prefs.getString('lang') ?? 'vi';
-              String nextLang = currentLang == 'en' ? 'vi' : 'en';
-              await prefs.setString('lang', nextLang);
-              // Phải khởi động lại trang chính hoặc cập nhật trạng thái
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(nextLang == 'en' ? 'Switched to English' : 'Đã chuyển sang Tiếng Việt')));
-                setState(() {});
-                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell()));
-              }
-            },
-          ),
           ValueListenableBuilder<List<Map<String, dynamic>>>(
             valueListenable: _notificationsNotifier,
             builder: (context, notifs, child) {
@@ -515,20 +623,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               return Stack(
                 alignment: Alignment.center,
                 children: [
-                  IconButton(icon: const Icon(Icons.notifications_none), onPressed: _showNotificationsPanel),
+                  IconButton(icon: Icon(Icons.notifications_none), onPressed: _showNotificationsPanel),
                   if (unreadCount > 0)
                     Positioned(
                       right: 8, top: 8,
                       child: Container(
                         padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                        child: Text(unreadCount > 9 ? '9+' : '$unreadCount', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text(unreadCount > 9 ? '9+' : '$unreadCount', style: const TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
                     )
                 ],
               );
             }
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
         ],
       ),
       
@@ -537,62 +645,82 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           children: [
             UserAccountsDrawerHeader(
               decoration: BoxDecoration(color: isDark ? Colors.grey[900] : Theme.of(context).colorScheme.primary),
-              accountName: Text(_userName, style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
-              accountEmail: Text('Quyền: $_role', style: const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.white70)),
-              currentAccountPicture: CircleAvatar(backgroundColor: isDark ? Colors.grey[800] : Theme.of(context).colorScheme.surface, backgroundImage: NetworkImage(_avatar)),
+              accountName: Text(_userName, style: const TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+              accountEmail: Text(LocalizationService().currentLanguage == 'vi' ? 'Quyền: $_role' : 'Role: $_role', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.white70)),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: isDark ? Colors.grey[800] : Colors.blue.shade100,
+                backgroundImage: (_localAvatarPath.isNotEmpty && File(_localAvatarPath).existsSync())
+                    ? FileImage(File(_localAvatarPath))
+                    : ((_avatar.isNotEmpty && !_avatar.contains('default.png') && !_isOfflineMode)
+                        ? NetworkImage(_avatar)
+                        : null),
+                child: ((_localAvatarPath.isEmpty || !File(_localAvatarPath).existsSync()) &&
+                        (_avatar.isEmpty || _avatar.contains('default.png') || _isOfflineMode))
+                    ? Text(_getInitialLetter(_userName), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue))
+                    : null,
+              ),
             ),
             
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  ListTile(leading: const Icon(Icons.person, color: Colors.blue), title: const Text('Hồ sơ cá nhân', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())); }),
-                  ListTile(leading: const Icon(Icons.lock_reset, color: Colors.blueGrey), title: const Text('Đổi mật khẩu', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())); }),
-                  ListTile(leading: const Icon(Icons.workspace_premium, color: Colors.amber), title: const Text('Bảng xếp hạng thi đua', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const RankingScreen())); }),
-                  ListTile(leading: const Icon(Icons.settings, color: Colors.grey), title: const Text('Cài đặt App', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())); }),
-                  ListTile(leading: const Icon(Icons.newspaper, color: Colors.blue), title: const Text('Tin tức & Thông báo', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const NewsScreen())); }),
-                  
-                  ListTile(leading: const Icon(Icons.scoreboard, color: Colors.amber), title: const Text('Tra cứu Điểm thi', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamLookupScreen())); }),
-                  ListTile(leading: const Icon(Icons.spellcheck, color: Colors.green), title: const Text('Trợ lý Grammar AI', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const GrammarCheckScreen())); }),
-
-                  const Divider(),
-                  const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('TƯ VẤN TÂM LÝ & HƯỚNG NGHIỆP', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
-                  
-                  ListTile(leading: const Icon(Icons.explore, color: Colors.green), title: const Text('Đánh giá Nghề nghiệp', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsultingTestScreen())); }),
-                  ListTile(leading: const Icon(Icons.forum, color: Colors.blue), title: const Text('Tư vấn trực tiếp', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const HumanChatListScreen())); }),
-                  ListTile(leading: const Icon(Icons.psychology, color: Colors.purple), title: const Text('Chuyên gia AI', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const AiConsultingScreen())); }),
-
-                  if (['STUDENT', 'RED_FLAG'].contains(_role))
-                    ListTile(leading: const Icon(Icons.warning_amber, color: Colors.orange), title: const Text('Lỗi của tôi / Sổ đầu bài', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen())); }),
-
-                  if (_isStaff) ...[
-                    const Divider(),
-                    const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('CÔNG TÁC NỀN NẾP & HỌC TẬP', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                  if (_isOfflineMode) ...[
+                    Padding(padding: EdgeInsets.all(16), child: Text(LocalizationService().currentLanguage == 'vi' ? 'CHẾ ĐỘ NGOẠI TUYẾN' : 'OFFLINE MODE', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
+                    if (_isStaff) ListTile(leading: Icon(Icons.qr_code_scanner, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra cổng (Offline)' : 'Gate Check (Offline)'), onTap: () { Navigator.pop(context); setState(() { _currentIndex = 1; }); }),
+                    if (_isStaff) ListTile(leading: Icon(Icons.fact_check, color: Colors.orange), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra lớp (Offline)' : 'Class Check (Offline)'), onTap: () { Navigator.pop(context); setState(() { _currentIndex = 2; }); }),
+                    if (_isStaff) ListTile(leading: Icon(Icons.history, color: Colors.purple), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Lịch sử vi phạm (Cache)' : 'Violation History (Cache)'), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ViolationHistoryScreen())); }),
+                    ListTile(leading: Icon(Icons.sync, color: Colors.green), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Đồng bộ Offline' : 'Sync Offline'), onTap: () { Navigator.pop(context); /* Implement sync if needed */ }),
+                  ] else ...[
+                    ListTile(leading: Icon(Icons.person, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Hồ sơ cá nhân' : 'My Profile', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen())); }),
+                    ListTile(leading: Icon(Icons.lock_reset, color: Colors.blueGrey), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Đổi mật khẩu' : 'Change Password', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ChangePasswordScreen())); }),
+                    ListTile(leading: Icon(Icons.workspace_premium, color: Colors.amber), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Bảng xếp hạng thi đua' : 'Leaderboard', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => RankingScreen())); }),
+                    ListTile(leading: Icon(Icons.settings, color: Colors.grey), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Cài đặt App' : 'App Settings', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsScreen())); }),// 
+//                     ListTile(leading: Icon(Icons.newspaper, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Tin tức & Thông báo' : 'News & Announcements', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => NewsScreen())); }),
                     
-                    ListTile(leading: const Icon(Icons.gavel, color: Colors.red), title: const Text('Quản lý Vi phạm', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageViolationsScreen())); }),
-                    ListTile(leading: const Icon(Icons.task, color: Colors.pink), title: const Text('Quản lý Kỳ thi', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageExamsScreen())); }),
-                    ListTile(leading: const Icon(Icons.history, color: Colors.purple), title: const Text('Lịch sử vi phạm', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen())); }),
-                    ListTile(leading: const Icon(Icons.edit_note, color: Colors.teal), title: const Text('Nhập điểm học tập', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const InputAcademicScreen())); }),
-                    ListTile(leading: const Icon(Icons.file_download, color: Colors.green), title: const Text('Xuất báo cáo Excel', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportReportScreen())); }),
-                    ListTile(leading: const Icon(Icons.co_present, color: Colors.deepOrange), title: const Text('Lớp của tôi', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen())); }),
-                  ],
+                    ListTile(leading: Icon(Icons.scoreboard, color: Colors.amber), title: Text(T('exam_lookup', def: LocalizationService().currentLanguage == 'vi' ? 'Tra cứu Điểm thi' : 'Exam Lookup'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ExamLookupScreen())); }),
+                    ListTile(leading: Icon(Icons.spellcheck, color: Colors.green), title: Text(T('grammar_ai', def: LocalizationService().currentLanguage == 'vi' ? 'Trợ lý Grammar AI' : 'Grammar AI'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => GrammarCheckScreen())); }),
 
-                  if (_isAdmin) ...[
                     const Divider(),
-                    const Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text('HỆ THỐNG', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                    Padding(padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text(T('counseling_career', def: LocalizationService().currentLanguage == 'vi' ? 'TƯ VẤN TÂM LÝ & HƯỚNG NGHIỆP' : 'COUNSELING & CAREER'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
                     
-                    ListTile(leading: const Icon(Icons.people_alt, color: Colors.indigo), title: const Text('Học sinh toàn trường', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStudentsScreen())); }),
-                    ListTile(leading: const Icon(Icons.admin_panel_settings, color: Colors.redAccent), title: const Text('Tài khoản & Phân quyền', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageUsersScreen())); }),
-                    ListTile(leading: const Icon(Icons.security, color: Colors.brown), title: const Text('Lịch sử khóa IP', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const BannedIpsScreen())); }),
-                    ListTile(leading: const Icon(Icons.analytics, color: Colors.blueGrey), title: const Text('Giám sát lưu lượng', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => const TrafficMonitorScreen())); }),
+                    ListTile(leading: Icon(Icons.explore, color: Colors.green), title: Text(T('career_advice', def: LocalizationService().currentLanguage == 'vi' ? 'Đánh giá Nghề nghiệp' : 'Career Assessment'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ConsultingTestScreen())); }),
+                    ListTile(leading: Icon(Icons.games, color: Colors.orange), title: Text(T('chess_game', def: LocalizationService().currentLanguage == 'vi' ? 'Cờ Vua Multiplayer' : 'Multiplayer Chess')), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ChessLobbyScreen())); }),
+                    ListTile(leading: Icon(Icons.forum, color: Colors.blue), title: Text(T('counseling_corner', def: LocalizationService().currentLanguage == 'vi' ? 'Chat' : 'Chat'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => HumanChatListScreen())); }),
+                    ListTile(leading: Icon(Icons.psychology, color: Colors.purple), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chuyên gia AI' : 'AI Expert', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => AiConsultingScreen())); }),
+
+                    if (['STUDENT', 'RED_FLAG'].contains(_role))
+                      ListTile(leading: Icon(Icons.warning_amber, color: Colors.orange), title: Text(T('student_violations', def: LocalizationService().currentLanguage == 'vi' ? 'Lỗi của tôi / Sổ đầu bài' : 'My Violations / Logbook'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => StudentViolationsScreen())); }),
+
+                    if (_isStaff) ...[
+                      const Divider(),
+                      Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text(T('discipline_academic', def: LocalizationService().currentLanguage == 'vi' ? 'CÔNG TÁC NỀN NẾP & HỌC TẬP' : 'DISCIPLINE & ACADEMIC WORK'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                      
+                      ListTile(leading: Icon(Icons.gavel, color: Colors.red), title: Text(T('manage_violations', def: LocalizationService().currentLanguage == 'vi' ? 'Quản lý Vi phạm' : 'Manage Violations'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageViolationsScreen())); }),
+                      ListTile(leading: Icon(Icons.task, color: Colors.pink), title: Text(T('manage_exams', def: LocalizationService().currentLanguage == 'vi' ? 'Quản lý Kỳ thi' : 'Manage Exams'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageExamsScreen())); }),
+                      ListTile(leading: Icon(Icons.history, color: Colors.purple), title: Text(T('violation_history', def: LocalizationService().currentLanguage == 'vi' ? 'Lịch sử vi phạm' : 'Violation History'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ViolationHistoryScreen())); }),
+                      ListTile(leading: Icon(Icons.edit_note, color: Colors.teal), title: Text(T('academic_scores', def: LocalizationService().currentLanguage == 'vi' ? 'Nhập điểm học tập' : 'Academic Scores'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => InputAcademicScreen())); }),
+                      ListTile(leading: Icon(Icons.file_download, color: Colors.green), title: Text(T('export_report', def: LocalizationService().currentLanguage == 'vi' ? 'Xuất báo cáo Excel' : 'Export Excel'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ExportReportScreen())); }),
+                      ListTile(leading: Icon(Icons.co_present, color: Colors.deepOrange), title: Text(T('teacher_dashboard', def: LocalizationService().currentLanguage == 'vi' ? 'Lớp của tôi' : 'My Class'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherDashboardScreen())); }),
+                    ],
+
+                    if (_isAdmin) ...[
+                      const Divider(),
+                      Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text(T('system_admin', def: LocalizationService().currentLanguage == 'vi' ? 'HỆ THỐNG' : 'SYSTEM'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                      
+                      ListTile(leading: Icon(Icons.people_alt, color: Colors.indigo), title: Text(T('manage_students', def: LocalizationService().currentLanguage == 'vi' ? 'Học sinh toàn trường' : 'All Students'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageStudentsScreen())); }),
+                      ListTile(leading: Icon(Icons.admin_panel_settings, color: Colors.redAccent), title: Text(T('manage_users', def: LocalizationService().currentLanguage == 'vi' ? 'Tài khoản & Phân quyền' : 'Accounts & Permissions'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageUsersScreen())); }),
+                      ListTile(leading: Icon(Icons.security, color: Colors.brown), title: Text(T('banned_ips', def: LocalizationService().currentLanguage == 'vi' ? 'Lịch sử khóa IP' : 'Banned IPs History'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => BannedIpsScreen())); }),
+                      ListTile(leading: Icon(Icons.analytics, color: Colors.blueGrey), title: Text(T('traffic_monitor', def: LocalizationService().currentLanguage == 'vi' ? 'Giám sát lưu lượng' : 'Traffic Monitor'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => TrafficMonitorScreen())); }),
+                    ],
                   ],
                 ],
               ),
             ),
             
             const Divider(height: 1),
-            ListTile(leading: const Icon(Icons.logout, color: Colors.redAccent), title: const Text('Đăng xuất', style: TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.redAccent, fontWeight: FontWeight.bold)), onTap: _logout),
-            const SizedBox(height: 20),
+            ListTile(leading: Icon(Icons.logout, color: Colors.redAccent), title: Text(T('logout', def: LocalizationService().currentLanguage == 'vi' ? 'Đăng xuất' : 'Logout'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.redAccent, fontWeight: FontWeight.bold)), onTap: _logout),
+            SizedBox(height: 20),
           ],
         ),
       ),
@@ -605,8 +733,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.withOpacity(0.05),
-                border: Border(bottom: BorderSide(color: Colors.blue.withOpacity(0.1))),
+                color: isDark ? Colors.blue.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.05),
+                border: Border(bottom: BorderSide(color: Colors.blue.withValues(alpha: 0.1))),
               ),
               child: MarqueeWidget(text: _tickerText),
             ),
@@ -618,9 +746,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         data: NavigationBarTheme.of(context).copyWith(
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary);
+              return TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary);
             }
-            return const TextStyle(fontFamily: 'Inter', fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey);
+            return const TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey);
           }),
         ),
         child: NavigationBar(
@@ -628,15 +756,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           onDestinationSelected: (int index) { setState(() { _currentIndex = index; }); },
           height: 70, labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: _isStaff 
-            ? const [
-                NavigationDestination(selectedIcon: Icon(Icons.home), icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
-                NavigationDestination(selectedIcon: Icon(Icons.qr_code_scanner), icon: Icon(Icons.qr_code_scanner_outlined), label: 'Kiểm tra cổng'),
-                NavigationDestination(selectedIcon: Icon(Icons.fact_check), icon: Icon(Icons.fact_check_outlined), label: 'Kiểm tra lớp'),
+            ? [
+                NavigationDestination(selectedIcon: Icon(Icons.home), icon: Icon(Icons.home_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Trang chủ' : 'Home'),
+                NavigationDestination(selectedIcon: Icon(Icons.qr_code_scanner), icon: Icon(Icons.qr_code_scanner_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra cổng' : 'Gate Check'),
+                NavigationDestination(selectedIcon: Icon(Icons.fact_check), icon: Icon(Icons.fact_check_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra lớp' : 'Class Check'),
               ]
-            : const [
-                NavigationDestination(selectedIcon: Icon(Icons.home), icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
-                NavigationDestination(selectedIcon: Icon(Icons.psychology), icon: Icon(Icons.psychology_outlined), label: 'Tư vấn AI'),
-                NavigationDestination(selectedIcon: Icon(Icons.workspace_premium), icon: Icon(Icons.workspace_premium_outlined), label: 'Xếp hạng'),
+            : [
+                NavigationDestination(selectedIcon: Icon(Icons.home), icon: Icon(Icons.home_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Trang chủ' : 'Home'),
+                NavigationDestination(selectedIcon: Icon(Icons.psychology), icon: Icon(Icons.psychology_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Tư vấn AI' : 'AI Advice'),
+                NavigationDestination(selectedIcon: Icon(Icons.workspace_premium), icon: Icon(Icons.workspace_premium_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Xếp hạng' : 'Ranking'),
               ],
         ),
       ),

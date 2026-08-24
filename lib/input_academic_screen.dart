@@ -1,7 +1,11 @@
+import 'localization_service.dart';
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'widgets/custom_numpad.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'widgets/liquid_glass_container.dart';
 import 'config.dart';
 
 class InputAcademicScreen extends StatefulWidget {
@@ -12,6 +16,7 @@ class InputAcademicScreen extends StatefulWidget {
 
 class _InputAcademicScreenState extends State<InputAcademicScreen> {
   bool _isLoading = true;
+  String? _editingCell;
   bool _isSaving = false;
   String _week = '';
   List<dynamic> _classesData = [];
@@ -86,7 +91,7 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
 
       if (!hasChanges) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Không có dữ liệu lớp nào thay đổi để lưu!'), backgroundColor: Colors.orange));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '⚠️ Không có dữ liệu lớp nào thay đổi để lưu!' : '⚠️ Khong co du lieu lop nao thay doi de luu!'), backgroundColor: Colors.orange));
         }
         setState(() => _isSaving = false);
         return;
@@ -108,13 +113,30 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
           c['score'] = saved['score'];
           c['count'] = saved['count'];
         }
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã lưu điểm học tập!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã lưu điểm học tập!' : '✅ Da luu diem hoc tap!'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Có lỗi xảy ra!'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Có lỗi xảy ra!' : '❌ An error occurred!'), backgroundColor: Colors.red));
     } finally {
       setState(() => _isSaving = false);
     }
+  }
+
+  
+  void _showNumpad(BuildContext context, TextEditingController ctrl, String cellId, String title) {
+    setState(() => _editingCell = cellId);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CustomNumpad(
+        title: title,
+        controller: ctrl,
+        onSubmit: () => Navigator.pop(context),
+      ),
+    ).then((_) {
+      if (mounted) setState(() => _editingCell = null);
+    });
   }
 
   @override
@@ -123,11 +145,11 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nhập Điểm Học Tập', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhập Điểm Học Tập' : 'Input Academic Scores', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           Row(
             children: [
-              Text('Tuần ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white70 : Colors.black87)),
+              Text(LocalizationService().currentLanguage == 'vi' ? 'Tuần ' : 'Week ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white70 : Colors.black87)),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   // Fix màu nền Dropbox theo chế độ sáng/tối
@@ -144,58 +166,49 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
               ),
             ],
           ),
-          const SizedBox(width: 15),
+          SizedBox(width: 15),
         ],
       ),
-      backgroundColor: isDark ? Theme.of(context).colorScheme.background : const Color(0xFFF0F2F5),
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surface : const Color(0xFFF0F2F5),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
+        ? Center(child: CircularProgressIndicator())
         : ListView.builder(
             padding: const EdgeInsets.only(bottom: 80, left: 12, right: 12, top: 12),
             itemCount: _classesData.length,
             itemBuilder: (context, index) {
               final c = _classesData[index];
               final cid = c['class_id'];
-              return Card(
-                color: isDark ? Colors.grey[900] : Colors.white,
-                elevation: 1, margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              return LiquidGlassContainer(
+                margin: const EdgeInsets.only(bottom: 8),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
                       Container(
                         width: 40, height: 40, alignment: Alignment.center, 
-                        decoration: BoxDecoration(color: isDark ? Colors.blue.withOpacity(0.2) : Colors.blue.shade50, shape: BoxShape.circle), 
+                        decoration: BoxDecoration(color: isDark ? Colors.blue.withValues(alpha: 0.2) : Colors.blue.shade50, shape: BoxShape.circle), 
                         child: Text('${index + 1}', style: TextStyle(color: isDark ? Colors.blue[300] : Colors.blue.shade700, fontWeight: FontWeight.bold))
                       ),
-                      const SizedBox(width: 15),
+                      SizedBox(width: 15),
                       Expanded(child: Text(c['class_name'], style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87))),
                       SizedBox(
-                        width: 60, 
+                        width: 60,
                         child: TextField(
-                          controller: _countCtrls[cid], keyboardType: TextInputType.number, textAlign: TextAlign.center, 
+                          readOnly: true, onTap: () => _showNumpad(context, _countCtrls[cid]!, '${cid}_count', '${c['class_name']} - ${LocalizationService().currentLanguage == 'vi' ? 'Số tiết' : 'Periods'}'), 
+                          controller: _countCtrls[cid], textAlign: TextAlign.center, 
                           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                          decoration: InputDecoration(
-                            labelText: 'Số tiết', labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54),
-                            contentPadding: const EdgeInsets.all(8), 
-                            border: const OutlineInputBorder(),
-                            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[400]!))
-                          )
+                          decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Số tiết' : 'Periods', labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54), contentPadding: const EdgeInsets.all(8), border: const OutlineInputBorder(), enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[400]!)), fillColor: _editingCell == '${cid}_count' ? Colors.blue.withValues(alpha: 0.2) : null, filled: _editingCell == '${cid}_count')
                         )
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       SizedBox(
                         width: 80, 
                         child: TextField(
-                          controller: _scoreCtrls[cid], keyboardType: const TextInputType.numberWithOptions(decimal: true), textAlign: TextAlign.center, 
+                          readOnly: true, onTap: () => _showNumpad(context, _scoreCtrls[cid]!, '${cid}_score', '${c['class_name']} - ${LocalizationService().currentLanguage == 'vi' ? 'Tổng điểm' : 'Total Score'}'), 
+                          controller: _scoreCtrls[cid], textAlign: TextAlign.center, 
                           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                          decoration: InputDecoration(
-                            labelText: 'Tổng điểm', labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54),
-                            contentPadding: const EdgeInsets.all(8), 
-                            border: const OutlineInputBorder(),
-                            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[400]!))
-                          )
+                          decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Tổng điểm' : 'Total Score', labelStyle: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54), contentPadding: const EdgeInsets.all(8), border: const OutlineInputBorder(), enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[400]!)), fillColor: _editingCell == '${cid}_score' ? Colors.blue.withValues(alpha: 0.2) : null, filled: _editingCell == '${cid}_score')
                         )
                       ),
                     ],
@@ -206,8 +219,8 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
           ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isSaving ? null : _saveData,
-        icon: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save),
-        label: const Text('LƯU ĐIỂM', style: TextStyle(fontWeight: FontWeight.bold)),
+        icon: _isSaving ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.save),
+        label: Text(LocalizationService().currentLanguage == 'vi' ? 'LƯU ĐIỂM' : 'SAVE SCORES', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Colors.white,
       ),
     );

@@ -1,8 +1,10 @@
+import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'edit_student_screen.dart';
+import 'widgets/liquid_glass_container.dart';
 import 'config.dart';
 
 class ManageStudentsScreen extends StatefulWidget {
@@ -61,7 +63,18 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Danh Sách Học Sinh', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Danh Sách Học Sinh' : 'Manage Students', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.qr_code_2),
+            tooltip: LocalizationService().currentLanguage == 'vi' ? 'Tải mã QR (.zip)' : 'Tai ma QR (.zip)',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đang tạo và tải file mã QR (.zip)...' : 'Dang tao va tai file ma QR (.zip)...')));
+            }
+          )
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -69,36 +82,40 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
             child: Row(
               children: [
                 Expanded(child: TextField(
-                  decoration: InputDecoration(hintText: 'Tìm mã/tên...', prefixIcon: const Icon(Icons.search), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), 
+                  decoration: InputDecoration(hintText: LocalizationService().currentLanguage == 'vi' ? 'Tìm mã/tên...' : 'Search code/name...', prefixIcon: Icon(Icons.search), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))), 
                   onChanged: (v) { _search = v; _fetchData(page: 1); }
                 )),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(child: DropdownButtonFormField<String>(
                   decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 10)),
-                  value: _classId.isEmpty ? null : _classId, hint: const Text('Tất cả lớp'),
-                  items: [const DropdownMenuItem(value: '', child: Text('Tất cả'))]..addAll(_classes.map((c) => DropdownMenuItem(value: c['id'].toString(), child: Text(c['name'])))),
+                  initialValue: _classId.isEmpty ? null : _classId, hint: Text(LocalizationService().currentLanguage == 'vi' ? 'Tất cả lớp' : 'All classes'),
+                  items: [DropdownMenuItem(value: '', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tất cả' : 'Tat ca')), ..._classes.map((c) => DropdownMenuItem(value: c['id'].toString(), child: Text(c['name'])))],
                   onChanged: (v) { setState(() => _classId = v!); _fetchData(page: 1); },
                 )),
               ],
             ),
           ),
           Expanded(
-            child: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
+            child: _isLoading ? Center(child: CircularProgressIndicator()) : ListView.builder(
               itemCount: _students.length,
               itemBuilder: (c, i) {
                 final s = _students[i];
                 bool hasPending = s['has_pending_changes'] == 1;
-                return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(
+                return LiquidGlassContainer(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: ListTile(
                   leading: CircleAvatar(
                     backgroundImage: s['image_url'] != null ? NetworkImage('${AppConfig.baseUrl}/${s['image_url']}') : null,
-                    child: s['image_url'] == null ? const Icon(Icons.person) : null,
+                    child: s['image_url'] == null ? Icon(Icons.person) : null,
                   ),
                   title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
                   // --- BỔ SUNG HIỂN THỊ BADGE CỜ ĐỎ DƯỚI TÊN ---
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("${s['code']} - Lớp: ${s['class_name']}"),
+                      Text(LocalizationService().currentLanguage == 'vi' ? "${s['code']} - Lớp: ${s['class_name']}" : "${s['code']} - Class: ${s['class_name']}"),
+                      if (s['dob'] != null && s['dob'].toString().isNotEmpty)
+                        Text(LocalizationService().currentLanguage == 'vi' ? "Ngày sinh: ${s['dob']}" : "DOB: ${s['dob']}", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                       if (s['role'] == 'RED_FLAG')
                         Container(
                           margin: const EdgeInsets.only(top: 4),
@@ -111,22 +128,36 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.flag, color: Colors.red, size: 12),
-                              const SizedBox(width: 4),
+                              Icon(Icons.flag, color: Colors.red, size: 12),
+                              SizedBox(width: 4),
                               Text(
-                                'Cờ đỏ ${s['homeroom_class_name'] ?? ''}', 
+                                LocalizationService().currentLanguage == 'vi' ? 'Cờ đỏ ${s["homeroom_class_name"] ?? ""}' : 'Red Flag ${s["homeroom_class_name"] ?? ""}',
                                 style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)
                               ),
                             ],
                           ),
                         ),
+                      if (hasPending)
+                        Container(
+                          margin: const EdgeInsets.only(top: 6),
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.orange.shade200)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [Icon(Icons.pending_actions, size: 14, color: Colors.orange), SizedBox(width: 4), Text(LocalizationService().currentLanguage == 'vi' ? 'Yêu cầu thay đổi:' : 'Yeu cau thay doi:', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 11))]),
+                              if (s['pending_changes'] != null) Text(s['pending_changes'].toString(), style: const TextStyle(fontSize: 11)),
+                              if (s['pending_changes'] == null) Text(LocalizationService().currentLanguage == 'vi' ? 'Cập nhật thông tin (Cũ -> Mới)' : 'Information update (Old -> New)', style: TextStyle(fontSize: 11)),
+                            ],
+                          )
+                        )
                     ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (hasPending) IconButton(icon: const Icon(Icons.check_circle, color: Colors.green), onPressed: () => _quickApprove(s['code']), tooltip: 'Duyệt thay đổi'),
-                      const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      if (hasPending) IconButton(icon: Icon(Icons.check_circle, color: Colors.green), onPressed: () => _quickApprove(s['code']), tooltip: LocalizationService().currentLanguage == 'vi' ? 'Duyệt thay đổi' : 'Duyet thay doi'),
+                      Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                     ],
                   ),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditStudentScreen(studentCode: s['code']))).then((_) => _fetchData(page: _currentPage)),
@@ -143,16 +174,16 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left), 
+                    icon: Icon(Icons.chevron_left), 
                     onPressed: _currentPage > 1 ? () => _fetchData(page: _currentPage - 1) : null,
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(color: isDark ? Colors.blue.withOpacity(0.2) : Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-                    child: Text('Trang $_currentPage / $_totalPages', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                    decoration: BoxDecoration(color: isDark ? Colors.blue.withValues(alpha: 0.2) : Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+                    child: Text(LocalizationService().currentLanguage == 'vi' ? 'Trang $_currentPage / $_totalPages' : 'Page $_currentPage / $_totalPages', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.chevron_right), 
+                    icon: Icon(Icons.chevron_right), 
                     onPressed: _currentPage < _totalPages ? () => _fetchData(page: _currentPage + 1) : null,
                   ),
                 ],

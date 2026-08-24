@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -103,7 +104,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
             _isProgrammaticEdit = true;
             
             // 2. TRIỆT TIÊU VÙNG BÔI ĐEN: Ép vùng chọn dồn về 1 điểm (cuối chữ bị lỗi)
-            // Cú chốt này khiến 2 giọt nước xanh bị "khai tử" hoàn toàn khi tắt BottomSheet
+            // Cú chốt này khiến 2 giọt nước xanh bị LocalizationService().currentLanguage == 'vi' ? "khai tử" : "khai tu" hoàn toàn khi tắt BottomSheet
             _textController.selection = TextSelection.collapsed(offset: issue.end);
             
             // 3. TẮT BÀN PHÍM
@@ -142,16 +143,16 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
       if (res.statusCode == 200 && res.data['status'] == 'success') {
         _apiIssues = res.data['issues'] ?? [];
         if (_apiIssues.isEmpty) {
-          _showMsg('Hoàn hảo! Không phát hiện lỗi nào.', Colors.green);
+          _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Hoàn hảo! Không phát hiện lỗi nào.' : 'Perfect! No errors detected.', Colors.green);
         } else {
           _processMatches(); 
-          _showMsg('Phát hiện ${_textController.issues.length} lỗi. Chạm vào chữ gạch đỏ để sửa.', Colors.orange);
+          _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Phát hiện ${_textController.issues.length} lỗi. Chạm vào chữ gạch đỏ để sửa.' : 'Detected ${_textController.issues.length} errors. Tap red underlined text to fix.', Colors.orange);
         }
       } else {
-        _showMsg(res.data['msg'] ?? 'Lỗi từ máy chủ AI', Colors.red);
+        _showMsg(res.data['msg'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Lỗi từ máy chủ AI' : 'AI server error'), Colors.red);
       }
     } catch (e) {
-      _showMsg('Lỗi kết nối đến máy chủ API', Colors.red);
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Lỗi kết nối đến máy chủ API' : 'API server connection error', Colors.red);
     }
     setState(() => _isScanning = false);
   }
@@ -208,7 +209,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
     _isProgrammaticEdit = false; 
 
     if (_textController.issues.isEmpty) {
-      _showMsg('Đã sửa xong toàn bộ lỗi!', Colors.green);
+      _showMsg(LocalizationService().currentLanguage == 'vi' ? 'Đã sửa xong toàn bộ lỗi!' : 'Fixed all errors!', Colors.green);
     }
   }
 
@@ -230,39 +231,39 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.auto_awesome, color: Colors.blue),
                 SizedBox(width: 8),
-                Text('Đề xuất từ AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
+                Text(LocalizationService().currentLanguage == 'vi' ? 'Đề xuất từ AI' : 'De xuat tu AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
               ],
             ),
-            const SizedBox(height: 15),
+            SizedBox(height: 15),
             Row(
               children: [
                 Text(issue.wrong, style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.red, fontSize: 18)),
-                const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Icon(Icons.arrow_right_alt, color: Colors.grey)),
+                Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Icon(Icons.arrow_right_alt, color: Colors.grey)),
                 Text(issue.correct, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 18)),
               ],
             ),
             if (issue.explanation.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(issue.explanation, style: TextStyle(fontSize: 14, color: isDark ? Colors.grey.shade300 : Colors.black87, fontStyle: FontStyle.italic)),
             ],
-            const SizedBox(height: 25),
+            SizedBox(height: 25),
             Row(
               children: [
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Bỏ qua', style: TextStyle(color: Colors.grey)),
+                    child: Text(LocalizationService().currentLanguage == 'vi' ? 'Bỏ qua' : 'Bo qua', style: TextStyle(color: Colors.grey)),
                   ),
                 ),
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
                     onPressed: () => _fixIssue(issue),
-                    child: const Text('Sửa lỗi này'),
+                    child: Text(LocalizationService().currentLanguage == 'vi' ? 'Sửa lỗi này' : 'Fix this error'),
                   ),
                 ),
               ],
@@ -281,7 +282,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? Theme.of(context).scaffoldBackgroundColor : Colors.grey.shade50,
-      appBar: AppBar(title: const Text('Trợ lý Grammar AI')),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Trợ lý Grammar AI' : 'Grammar AI')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -295,17 +296,17 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.language, color: Colors.blue),
-                  const SizedBox(width: 8),
+                  Icon(Icons.language, color: Colors.blue),
+                  SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
                         value: _currentLang,
                         dropdownColor: Theme.of(context).cardColor,
-                        items: const [
-                          DropdownMenuItem(value: 'en', child: Text('English (Tiếng Anh)')),
-                          DropdownMenuItem(value: 'vi', child: Text('Vietnamese (Tiếng Việt)')),
+                        items: [
+                          DropdownMenuItem(value: 'en', child: Text(LocalizationService().currentLanguage == 'vi' ? 'English (Tiếng Anh)' : 'English')),
+                          DropdownMenuItem(value: 'vi', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Vietnamese (Tiếng Việt)' : 'Vietnamese')),
                         ],
                         onChanged: (v) {
                           if (v != null) {
@@ -321,7 +322,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
 
             // KHUNG NHẬP LIỆU (Tự đổi màu sáng/tối)
             TextField(
@@ -329,7 +330,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
               maxLines: 12,
               style: TextStyle(fontSize: 16, color: isDark ? Colors.white : Colors.black),
               decoration: InputDecoration(
-                hintText: _currentLang == 'en' ? 'Type your English paragraph here (Ex: I loves Duong)...' : 'Nhập đoạn văn (VD: hôm lay tôi nàm bài suất xắc)...',
+                hintText: _currentLang == 'en' ? 'Enter text to check...' : LocalizationService().currentLanguage == 'vi' ? 'Nhập đoạn văn (VD: hôm lay tôi nàm bài suất xắc)...' : 'Nhap doan van (VD: hom lay toi nam bai suat xac)...',
                 hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
                 filled: true,
                 fillColor: Theme.of(context).cardColor,
@@ -337,7 +338,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             SizedBox(
               width: double.infinity,
@@ -348,8 +349,8 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                icon: _isScanning ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.auto_awesome),
-                label: Text(_isScanning ? 'Đang phân tích AI...' : 'Quét lỗi (Scan)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                icon: _isScanning ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.auto_awesome),
+                label: Text(_isScanning ? LocalizationService().currentLanguage == 'vi' ? 'Đang phân tích AI...' : 'Dang phan tich AI...' : LocalizationService().currentLanguage == 'vi' ? 'Quét lỗi (Scan)' : 'Scan Errors', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 onPressed: _isScanning ? null : _scanText,
               ),
             )

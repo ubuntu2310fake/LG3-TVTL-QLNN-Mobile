@@ -1,4 +1,7 @@
+import 'localization_service.dart';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -20,16 +23,16 @@ class OfflineQueueService {
       initializationSettings,
     );
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+    AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
       'offline_sync_channel_1', 
-      'Đồng bộ Offline',
-      channelDescription: 'Thông báo khi ứng dụng đồng bộ dữ liệu lúc có mạng',
+      LocalizationService().currentLanguage == 'vi' ? 'Đồng bộ Offline' : 'Offline Sync',
+      channelDescription: LocalizationService().currentLanguage == 'vi' ? 'Thông báo khi ứng dụng đồng bộ dữ liệu lúc có mạng' : 'Notify when app syncs data online',
       importance: Importance.max, 
       priority: Priority.high,
       ticker: 'ticker',
       icon: '@mipmap/ic_launcher',
     );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+    NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
     
     // FIX 2: Bắt buộc dùng tham số có tên cho hàm show() ở bản mới
     await flutterLocalNotificationsPlugin.show(
@@ -91,14 +94,16 @@ class OfflineQueueService {
     await prefs.setStringList(_queueKey, queue);
 
     // 1. Lưu vào chuông in-app để biết là đang chờ
-    await _addLocalNotification('⏳ Đã lưu ngầm (Offline)', 'Chờ có mạng: $title');
+    await _addLocalNotification(LocalizationService().currentLanguage == 'vi' ? '⏳ Đã lưu ngầm (Offline)' : '⏳ Saved locally (Offline)', LocalizationService().currentLanguage == 'vi' ? 'Chờ có mạng: $title' : 'Waiting for network: $title');
 
-    // 2. Kích hoạt lính đánh thuê 1 lần (Ép nổ ở giây thứ 1 khi có Wifi)
-    Workmanager().registerOneOffTask(
-      "instant_sync_$uniqueId", 
-      "syncOfflineQueue", // Gọi đúng tên task đã khai báo ở main.dart
-      constraints: Constraints(networkType: NetworkType.connected),
-    );
+    // 2. Kích hoạt lính đánh thuê 1 lần (Ép nổ ở giây thứ 1 khi có Wifi trên Android)
+    if (!kIsWeb && Platform.isAndroid) {
+      Workmanager().registerOneOffTask(
+        "instant_sync_$uniqueId", 
+        "syncOfflineQueue", // Gọi đúng tên task đã khai báo ở main.dart
+        constraints: Constraints(networkType: NetworkType.connected),
+      );
+    }
   }
 
   // --- HÀM 4: XỬ LÝ ĐẨY DỮ LIỆU LÊN SERVER KHI CÓ MẠNG (CHẠY NGẦM) ---
@@ -145,12 +150,12 @@ class OfflineQueueService {
           if (response.statusCode == 200 && data['status'] == 'success') {
             
             // THÀNH CÔNG -> 1. Luôn lưu vào hộp thư In-App để tăng số chuông đỏ
-            await _addLocalNotification('✅ Đồng bộ thành công', item['title']);
+            await _addLocalNotification(LocalizationService().currentLanguage == 'vi' ? '✅ Đồng bộ thành công' : '✅ Sync successful', item['title']);
             
             // THÀNH CÔNG -> 2. Chỉ Rung máy (System Noti) khi User cho phép
             if (isNotiEnabled) {
                // Dùng hashcode của ID để tạo mã thông báo duy nhất, không bị đè nhau
-               await _showSystemNotification(item['id'].hashCode, 'Đồng bộ dữ liệu thành công', item['title']);
+               await _showSystemNotification(item['id'].hashCode, LocalizationService().currentLanguage == 'vi' ? 'Đồng bộ dữ liệu thành công' : 'Data sync successful', item['title']);
             }
             
           } else {

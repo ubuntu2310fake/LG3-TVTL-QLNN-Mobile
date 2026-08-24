@@ -1,10 +1,10 @@
 name: lg3_tvtl_qlnn
 description: "Phần mềm tư vấn tâm lý và quản lý thi đua - trường THPT Lạng Giang 3"
 publish_to: 'none'
-version: 2.0.0+6
+version: 2.0.1+7
 
 environment:
-  sdk: ^3.10.4
+  sdk: ">=3.5.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -13,25 +13,29 @@ dependencies:
   http: ^1.2.1
   shared_preferences: ^2.2.3
   webview_flutter: ^4.8.0
-  device_info_plus: ^10.1.0
+  device_info_plus: any
   image_picker: ^1.1.2
   path_provider: ^2.1.3
-  mobile_scanner: ^5.1.1
+  mobile_scanner: any
   firebase_messaging: ^15.0.4
   firebase_core: ^3.3.0
-  flutter_local_notifications: ^17.2.1
-  workmanager: ^0.9.0
+  flutter_local_notifications: ^17.1.2
+  workmanager: any
   dio: ^5.5.0
-  open_filex: ^4.4.0
+  open_filex: any
   permission_handler: ^11.3.1
   encrypt: ^5.0.3
   image_cropper: ^12.0.0
   flutter_displaymode: ^0.6.0
   http_parser: ^4.0.2
+  mime: ^1.0.4
   connectivity_plus: ^6.0.3  # Từ cấu trúc build, có thể được sử dụng
   file_picker: ^8.0.3 # Hoặc ^8.1.2, cứ đổi số 6 thành số 8 là bao mượt
   ffmpeg_kit_flutter_new: ^4.1.0
   flutter_launcher_icons: ^0.14.4
+  flutter_markdown: ^0.7.7+1
+  google_fonts: ^8.2.1
+  flutter_chess_board: ^1.0.1
 
 dev_dependencies:
   flutter_test:
@@ -41,20 +45,23 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: "launcher_icon"
-  ios: true
   image_path: "assets/images/lg3512512.png" 
   min_sdk_android: 24
 
 # BẮT ĐẦU PHẦN CẤU HÌNH FLUTTER (PHẢI SÁT LỀ TRÁI)
 flutter:
+  # config:
+  #   enable-lldb-debugging: false
   uses-material-design: true
 
   assets:
+    - assets/images/
     - assets/images/lg3512512.png
+    - assets/lang/
     - assets/images/lg3100100.png
 
   fonts:
     - family: Inter
       fonts:
         # TÊN FILE KHỚP VỚI ẢNH CHỤP
-        - asset: assets/fonts/Inter-VariableFont_opsz,wght.ttf
+        - asset: "assets/fonts/Inter-VariableFont_opsz,wght.ttf"

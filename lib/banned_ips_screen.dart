@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -42,10 +43,10 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Xác nhận'), content: Text('Bạn muốn mở khóa cho IP $ip?'),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận' : 'Confirm'), content: Text(LocalizationService().currentLanguage == 'vi' ? 'Bạn muốn mở khóa cho IP $ip?' : 'Do you want to unban IP $ip?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Mở khóa', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Mở khóa' : 'Mo khoa', style: TextStyle(color: Colors.red))),
         ],
       )
     );
@@ -61,7 +62,7 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
       );
       final data = jsonDecode(response.body);
       if (data['status'] == 'success' && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã mở khóa IP!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã mở khóa IP!' : '✅ Da mo khoa IP!'), backgroundColor: Colors.green));
         _fetchIps();
       }
     } catch (e) {}
@@ -70,11 +71,11 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Lịch sử khóa IP', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Lịch sử khóa IP' : 'Banned IPs History', style: TextStyle(fontWeight: FontWeight.bold))),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
+        ? Center(child: CircularProgressIndicator())
         : _ips.isEmpty 
-          ? const Center(child: Text('Không có IP nào bị khóa.'))
+          ? Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Không có IP nào bị khóa.' : 'No banned IPs found.'))
           : RefreshIndicator(
               onRefresh: _fetchIps,
               child: ListView.builder(
@@ -113,27 +114,27 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 10), // Giữ khoảng cách an toàn với nút Badge
+                              SizedBox(width: 10), // Giữ khoảng cách an toàn với nút Badge
                               
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(color: isExpired ? Colors.green.shade50 : Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                                child: Text(isExpired ? 'Đã hết hạn' : 'Đang khóa', style: TextStyle(color: isExpired ? Colors.green : Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
+                                child: Text(isExpired ? LocalizationService().currentLanguage == 'vi' ? 'Đã hết hạn' : 'Da het han' : LocalizationService().currentLanguage == 'vi' ? 'Đang khóa' : 'Dang khoa', style: TextStyle(color: isExpired ? Colors.green : Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
                               )
                             ],
                           ),
                           const Divider(),
-                          Text('Lý do: ${item['reason']}', style: TextStyle(color: Colors.grey.shade700)),
-                          Text('Ngày khóa: ${item['banned_at']}'),
-                          Text('Hết hạn: ${item['expires_at']}', style: TextStyle(fontWeight: FontWeight.bold, color: isExpired ? Colors.green : Colors.orange.shade700)),
+                          Text(LocalizationService().currentLanguage == 'vi' ? 'Lý do: ${item["reason"]}' : 'Reason: ${item["reason"]}', style: TextStyle(color: Colors.grey.shade700)),
+                          Text(LocalizationService().currentLanguage == 'vi' ? 'Ngày khóa: ${item["banned_at"]}' : 'Banned at: ${item["banned_at"]}'),
+                          Text(LocalizationService().currentLanguage == 'vi' ? 'Hết hạn: ${item["expires_at"]}' : 'Expires at: ${item["expires_at"]}', style: TextStyle(fontWeight: FontWeight.bold, color: isExpired ? Colors.green : Colors.orange.shade700)),
                           if (!isExpired) ...[
-                            const SizedBox(height: 10),
+                            SizedBox(height: 10),
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton.icon(
                                 onPressed: () => _unbanIp(item['id'], item['ip_address']),
-                                icon: const Icon(Icons.lock_open, color: Colors.red),
-                                label: const Text('MỞ KHÓA NGAY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                icon: Icon(Icons.lock_open, color: Colors.red),
+                                label: Text('MỞ KHÓA NGAY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                                 style: TextButton.styleFrom(backgroundColor: Colors.red.shade50),
                               ),
                             )

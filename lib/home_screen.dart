@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'localization_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart'; 
@@ -22,7 +23,7 @@ import 'manage_users_screen.dart';
 import 'banned_ips_screen.dart';
 import 'traffic_monitor_screen.dart'; 
 import 'consulting_test_screen.dart';
-import 'news_screen.dart';
+import 'news_screen.dart' hide AppConfig;
 import 'exam_lookup_screen.dart';
 import 'manage_exams_screen.dart';
 import 'grammar_check_screen.dart';
@@ -31,20 +32,20 @@ import 'human_chat_list_screen.dart';
 import 'ai_consulting_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  final Function(int) onNavigate; 
-  const HomeScreen({super.key, required this.onNavigate});
+  final Function(int) onNavigate;
+  final bool isOffline;
+  const HomeScreen({super.key, required this.onNavigate, this.isOffline = false});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _userName = 'Đang tải...';
+  String _userName = LocalizationService().currentLanguage == 'vi' ? 'Đang tải...' : 'Loading...';
   String _role = 'STUDENT';
   bool _isNotiEnabled = false;
   bool _isSyncing = false;
-  String _lastSyncStr = "Chưa rõ";
-  String _lang = 'vi';
+  String _lastSyncStr = LocalizationService().currentLanguage == 'vi' ? "Chưa rõ" : "Not clear yet";
 
   @override
   void initState() {
@@ -56,15 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userName = prefs.getString('full_name') ?? (prefs.getString('lang') == 'en' ? 'User' : 'Người dùng');
+      _userName = prefs.getString('full_name') ?? (LocalizationService().currentLanguage == 'vi' ? 'Người dùng' : 'User');
       _role = prefs.getString('role') ?? 'STUDENT';
       _isNotiEnabled = prefs.getBool('push_enabled') ?? false;
-      _lang = prefs.getString('lang') ?? 'vi';
     });
-  }
-
-  String _t(String vi, String en) {
-    return _lang == 'en' ? en : vi;
   }
 
   // HÀM ĐỒNG BỘ CHUẨN BẢN 1.0.4
@@ -72,7 +68,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isSyncing) return;
     setState(() => _isSyncing = true);
 
-    final success = await OfflineSyncService.syncData();
+    final prefs = await SharedPreferences.getInstance();
+      final sessionId = prefs.getString('phpsessid') ?? '';
+      await OfflineSyncService.syncUserAvatar(sessionId);
+      final success = await OfflineSyncService.syncData();
     
     if (mounted) {
       setState(() {
@@ -86,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleNotification(bool value) async {
-    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (c) => Center(child: CircularProgressIndicator()));
     final prefs = await SharedPreferences.getInstance();
     final sessionId = prefs.getString('phpsessid') ?? '';
     
@@ -126,9 +125,97 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isStaff = ['TEACHER', 'ADMIN', 'RED_FLAG'].contains(_role);
     bool isAdmin = _role == 'ADMIN';
     bool isStudent = ['STUDENT', 'RED_FLAG'].contains(_role);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (widget.isOffline) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // OFFLINE BANNER
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off_rounded, color: Colors.red, size: 36),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          LocalizationService().currentLanguage == 'vi' ? 'CHẾ ĐỘ NGOẠI TUYẾN' : 'OFFLINE MODE',
+                          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          LocalizationService().currentLanguage == 'vi'
+                              ? (LocalizationService().currentLanguage == 'vi' ? 'Đang mất kết nối mạng. Chỉ các tính năng ngoại tuyến khả dụng.' : 'Network connection lost. Only offline features available.')
+                              : 'Network disconnected. Only offline features are available.',
+                          style: TextStyle(color: isDark ? Colors.grey[300] : Colors.black87, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // THẺ ĐỒNG BỘ CỤC BỘ
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(side: BorderSide(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: _isSyncing 
+                  ? const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3)) 
+                  : const Icon(Icons.cloud_done_rounded, color: Colors.green, size: 32),
+                title: Text(LocalizationService().currentLanguage == 'vi' ? 'Dữ liệu Cục bộ' : 'Local Data', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                subtitle: Text(_isSyncing ? (LocalizationService().currentLanguage == 'vi' ? 'Đang tải...' : 'Loading...') : (LocalizationService().currentLanguage == 'vi' ? 'Cập nhật: $_lastSyncStr' : 'Updated: $_lastSyncStr')),
+                trailing: OutlinedButton.icon(
+                  onPressed: _isSyncing ? null : _triggerAutoSync, 
+                  icon: const Icon(Icons.sync, size: 18), 
+                  label: Text(LocalizationService().currentLanguage == 'vi' ? 'Tải lại' : 'Refresh')
+                ),
+              ),
+            ),
+            const SizedBox(height: 25),
+
+            _buildSectionTitle(LocalizationService().currentLanguage == 'vi' ? 'CHỨC NĂNG KHẢ DỤNG (OFFLINE)' : 'AVAILABLE FEATURES (OFFLINE)'),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.0,
+              children: [
+                if (isStaff) ...[
+                  _buildActionBtn(context, Icons.qr_code_scanner, LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra Cổng' : 'Gate Check', Colors.purple, () => widget.onNavigate(1)),
+                  _buildActionBtn(context, Icons.fact_check, LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra Lớp' : 'Class Check', Colors.amber, () => widget.onNavigate(2)),
+                  _buildActionBtn(context, Icons.history, LocalizationService().currentLanguage == 'vi' ? 'LS Vi phạm' : 'Violation History', Colors.deepPurple, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen()))),
+                ],
+                if (isStudent)
+                  _buildActionBtn(context, Icons.warning_amber, LocalizationService().currentLanguage == 'vi' ? 'Lỗi của tôi' : 'My Violations', Colors.orange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()))),
+                _buildActionBtn(context, Icons.settings, LocalizationService().currentLanguage == 'vi' ? 'Cài đặt' : 'Settings', Colors.grey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120), // FIX: Prevent bottom nav overlap
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -139,13 +226,13 @@ class _HomeScreenState extends State<HomeScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_t('Xin chào,', 'Hello,'), style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+                  Text(LocalizationService().currentLanguage == 'vi' ? 'Xin chào,' : 'Hello,', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
                   Text(_userName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
 
           // 1. THẺ ĐỒNG BỘ CỤC BỘ (GIAO DIỆN CHUẨN 1.0.4)
           Card(
@@ -154,18 +241,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               leading: _isSyncing 
-                ? const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3)) 
-                : const Icon(Icons.cloud_done_rounded, color: Colors.green, size: 32),
-              title: Text(_t('Dữ liệu Cục bộ', 'Local Data'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: Text(_isSyncing ? _t('Đang tải...', 'Loading...') : _t('Cập nhật: $_lastSyncStr', 'Updated: $_lastSyncStr')),
+                ? SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3)) 
+                : Icon(Icons.cloud_done_rounded, color: Colors.green, size: 32),
+              title: Text(LocalizationService().currentLanguage == 'vi' ? 'Dữ liệu Cục bộ' : 'Local Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: Text(_isSyncing ? (LocalizationService().currentLanguage == 'vi' ? 'Đang tải...' : 'Loading...') : (LocalizationService().currentLanguage == 'vi' ? 'Cập nhật: $_lastSyncStr' : 'Updated: $_lastSyncStr')),
               trailing: OutlinedButton.icon(
                 onPressed: _isSyncing ? null : _triggerAutoSync, 
-                icon: const Icon(Icons.sync, size: 18), 
-                label: Text(_t('Tải lại', 'Reload'))
+                icon: Icon(Icons.sync, size: 18), 
+                label: Text(LocalizationService().currentLanguage == 'vi' ? 'Tải lại' : 'Refresh')
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
 
           // 2. THẺ THÔNG BÁO PUSH (GIAO DIỆN 1.0.5)
           Card(
@@ -176,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
               secondary: Container(
                 padding: const EdgeInsets.all(8), 
                 decoration: BoxDecoration(
-                  color: _isNotiEnabled ? Colors.orange.withOpacity(0.1) : Colors.grey.withOpacity(0.1), 
+                  color: _isNotiEnabled ? Colors.orange.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1), 
                   borderRadius: BorderRadius.circular(10)
                 ), 
                 child: Icon(
@@ -185,93 +272,93 @@ class _HomeScreenState extends State<HomeScreen> {
                   size: 24
                 )
               ),
-              title: Text(_t('Nhận Thông báo', 'Receive Notifications'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: Text(_t('Báo điểm trừ, tin nhắn AI', 'Penalty alert, AI chat')),
+              title: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhận Thông báo' : 'Receive Notifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: Text(LocalizationService().currentLanguage == 'vi' ? 'Báo điểm trừ, tin nhắn AI' : 'Deduction & AI alerts'),
               value: _isNotiEnabled, 
-              activeColor: Colors.orange, 
+              activeThumbColor: Colors.orange, 
               onChanged: _toggleNotification,
             ),
           ),
-          const SizedBox(height: 30),
+          SizedBox(height: 30),
   
           // BẢNG ĐIỀU KHIỂN PHÂN LOẠI (GIAO DIỆN BẢN MỚI)
           
           // --- 1. TÀI KHOẢN & CÁ NHÂN ---
-          _buildSectionTitle(_t('TÀI KHOẢN & CÁ NHÂN', 'ACCOUNT & PERSONAL')),
+          _buildSectionTitle(LocalizationService().currentLanguage == 'vi' ? 'TÀI KHOẢN & CÁ NHÂN' : 'ACCOUNT & PERSONAL'),
           GridView.count(
             shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.0,
             children: [
-              _buildActionBtn(context, Icons.person, _t('Hồ sơ', 'Profile'), Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()))),
-              _buildActionBtn(context, Icons.lock_reset, _t('Đổi mật khẩu', 'Change Password'), Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
-              _buildActionBtn(context, Icons.settings, _t('Cài đặt', 'Settings'), Colors.grey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))),
-              if (isStudent) _buildActionBtn(context, Icons.warning_amber, _t('Lỗi của tôi', 'My Violations'), Colors.orange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()))),
+              _buildActionBtn(context, Icons.person, LocalizationService().currentLanguage == 'vi' ? 'Hồ sơ' : 'Profile', Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen()))),
+              _buildActionBtn(context, Icons.lock_reset, LocalizationService().currentLanguage == 'vi' ? 'Đổi mật khẩu' : 'Password', Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChangePasswordScreen()))),
+              _buildActionBtn(context, Icons.settings, LocalizationService().currentLanguage == 'vi' ? 'Cài đặt' : 'Settings', Colors.grey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => SettingsScreen()))),
+              if (isStudent) _buildActionBtn(context, Icons.warning_amber, LocalizationService().currentLanguage == 'vi' ? 'Lỗi của tôi' : 'My Violations', Colors.orange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => StudentViolationsScreen()))),
             ],
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: 25),
   
           // --- 2. HỌC TẬP & TIỆN ÍCH ---
-          _buildSectionTitle(_t('HỌC TẬP & TIỆN ÍCH', 'ACADEMIC & UTILITIES')),
+          _buildSectionTitle(LocalizationService().currentLanguage == 'vi' ? 'HỌC TẬP & TIỆN ÍCH' : 'LEARNING & TOOLS'),
           GridView.count(
             shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.0,
-            children: [
-              _buildActionBtn(context, Icons.newspaper, _t('Tin tức', 'News'), Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewsScreen()))),
-              _buildActionBtn(context, Icons.scoreboard, _t('Điểm thi', 'Exam Scores'), Colors.amber, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamLookupScreen()))),
+            children: [// 
+//               _buildActionBtn(context, Icons.newspaper, LocalizationService().currentLanguage == 'vi' ? 'Tin tức' : 'News', Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => NewsScreen()))),
+              _buildActionBtn(context, Icons.scoreboard, LocalizationService().currentLanguage == 'vi' ? 'Điểm thi' : 'Exam Scores', Colors.amber, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExamLookupScreen()))),
               _buildActionBtn(context, Icons.spellcheck, 'Grammar AI', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GrammarCheckScreen()))),
-              _buildActionBtn(context, Icons.workspace_premium, _t('Xếp hạng', 'Ranking'), Colors.amber, () => isStaff ? Navigator.push(context, MaterialPageRoute(builder: (_) => const RankingScreen())) : widget.onNavigate(2)),
+              _buildActionBtn(context, Icons.workspace_premium, LocalizationService().currentLanguage == 'vi' ? 'Xếp hạng' : 'Ranking', Colors.amber, () => isStaff ? Navigator.push(context, MaterialPageRoute(builder: (_) => RankingScreen())) : widget.onNavigate(2)),
             ],
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: 25),
   
           // --- 3. TÂM LÝ & HƯỚNG NGHIỆP ---
-          _buildSectionTitle(_t('TÂM LÝ & HƯỚNG NGHIỆP', 'PSYCHOLOGY & CAREER')),
+          _buildSectionTitle(LocalizationService().currentLanguage == 'vi' ? 'TÂM LÝ & HƯỚNG NGHIỆP' : 'COUNSELING & CAREER'),
           GridView.count(
             shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.0,
             children: [
-              _buildActionBtn(context, Icons.explore, _t('Nghề nghiệp', 'Career'), Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsultingTestScreen()))),
-              _buildActionBtn(context, Icons.forum, _t('Tư vấn 1:1 ', '1:1 Consulting'), Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HumanChatListScreen()))),
-              _buildActionBtn(context, Icons.psychology, _t('Chuyên gia AI', 'AI Specialist'), Colors.purple, () => isStaff ? Navigator.push(context, MaterialPageRoute(builder: (_) => const AiConsultingScreen())) : widget.onNavigate(1)),
+              _buildActionBtn(context, Icons.explore, LocalizationService().currentLanguage == 'vi' ? 'Nghề nghiệp' : 'Career Test', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConsultingTestScreen()))),
+              _buildActionBtn(context, Icons.forum, LocalizationService().currentLanguage == 'vi' ? 'Chat' : 'Chat', Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => HumanChatListScreen()))),
+              _buildActionBtn(context, Icons.psychology, LocalizationService().currentLanguage == 'vi' ? 'Chuyên gia AI' : 'AI Expert', Colors.purple, () => isStaff ? Navigator.push(context, MaterialPageRoute(builder: (_) => AiConsultingScreen())) : widget.onNavigate(1)),
             ],
           ),
   
           // --- 4. CÔNG TÁC TRỰC TUẦN (CHỈ DÀNH CHO STAFF/GIÁO VIÊN) ---
           if (isStaff) ...[
-            const SizedBox(height: 25),
-            _buildSectionTitle(_t('CÔNG TÁC TRỰC TUẦN & NỀN NẾP', 'WEEKLY DUTY & DISCIPLINE')),
+            SizedBox(height: 25),
+            _buildSectionTitle(LocalizationService().currentLanguage == 'vi' ? 'CÔNG TÁC TRỰC TUẦN & NỀN NẾP' : 'DISCIPLINE & WEEKLY DUTY'),
             GridView.count(
               shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.0,
               children: [
-                _buildActionBtn(context, Icons.qr_code_scanner, _t('Kiểm tra Cổng', 'Gate Check'), Colors.purple, () => widget.onNavigate(1)),
-                _buildActionBtn(context, Icons.fact_check, _t('Kiểm tra Lớp', 'Class Check'), Colors.amber, () => widget.onNavigate(2)),
-                _buildActionBtn(context, Icons.co_present, _t('Lớp của tôi', 'My Class'), Colors.deepOrange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()))),
-                _buildActionBtn(context, Icons.edit_note, _t('Nhập điểm học tập', 'Academic Scores'), Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InputAcademicScreen()))),
-                _buildActionBtn(context, Icons.gavel, _t('QL Vi phạm', 'Manage Violations'), Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageViolationsScreen()))),
-                _buildActionBtn(context, Icons.history, _t('LS Vi phạm', 'Violation History'), Colors.deepPurple, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen()))),
-                _buildActionBtn(context, Icons.task, _t('QL Kỳ thi', 'Manage Exams'), Colors.pink, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageExamsScreen()))),
-                _buildActionBtn(context, Icons.file_download, _t('Xuất báo cáo Excel', 'Export Excel'), Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportReportScreen()))),
+                _buildActionBtn(context, Icons.qr_code_scanner, LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra Cổng' : 'Gate Check', Colors.purple, () => widget.onNavigate(1)),
+                _buildActionBtn(context, Icons.fact_check, LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra Lớp' : 'Class Check', Colors.amber, () => widget.onNavigate(2)),
+                _buildActionBtn(context, Icons.co_present, LocalizationService().currentLanguage == 'vi' ? 'Lớp của tôi' : 'My Class', Colors.deepOrange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherDashboardScreen()))),
+                _buildActionBtn(context, Icons.edit_note, LocalizationService().currentLanguage == 'vi' ? 'Nhập điểm học tập' : 'Academic Scores', Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (_) => InputAcademicScreen()))),
+                _buildActionBtn(context, Icons.gavel, LocalizationService().currentLanguage == 'vi' ? 'QL Vi phạm' : 'Manage Violations', Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageViolationsScreen()))),
+                _buildActionBtn(context, Icons.history, LocalizationService().currentLanguage == 'vi' ? 'LS Vi phạm' : 'Violation History', Colors.deepPurple, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ViolationHistoryScreen()))),
+                _buildActionBtn(context, Icons.task, LocalizationService().currentLanguage == 'vi' ? 'QL Kỳ thi' : 'Manage Exams', Colors.pink, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageExamsScreen()))),
+                _buildActionBtn(context, Icons.file_download, LocalizationService().currentLanguage == 'vi' ? 'Xuất báo cáo Excel' : 'Export Excel', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExportReportScreen()))),
               ],
             ),
           ],
   
           // --- 5. QUẢN TRỊ HỆ THỐNG (CHỈ DÀNH CHO ADMIN) ---
           if (isAdmin) ...[
-            const SizedBox(height: 25),
-            _buildSectionTitle(_t('QUẢN TRỊ HỆ THỐNG', 'SYSTEM ADMINISTRATION')),
+            SizedBox(height: 25),
+            _buildSectionTitle(LocalizationService().currentLanguage == 'vi' ? 'QUẢN TRỊ HỆ THỐNG' : 'SYSTEM ADMINISTRATION'),
             GridView.count(
               shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.0,
               children: [
-                _buildActionBtn(context, Icons.people_alt, _t('Học sinh', 'Students'), Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStudentsScreen()))),
-                _buildActionBtn(context, Icons.admin_panel_settings, _t('Tài khoản', 'Accounts'), Colors.redAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageUsersScreen()))),
-                _buildActionBtn(context, Icons.security, _t('Khóa IP', 'Banned IPs'), Colors.brown, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BannedIpsScreen()))),
-                _buildActionBtn(context, Icons.analytics, _t('Lưu lượng', 'Traffic Monitor'), Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrafficMonitorScreen()))),
+                _buildActionBtn(context, Icons.people_alt, LocalizationService().currentLanguage == 'vi' ? 'Học sinh' : 'Students', Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageStudentsScreen()))),
+                _buildActionBtn(context, Icons.admin_panel_settings, LocalizationService().currentLanguage == 'vi' ? 'Tài khoản' : 'Accounts', Colors.redAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageUsersScreen()))),
+                _buildActionBtn(context, Icons.security, LocalizationService().currentLanguage == 'vi' ? 'Khóa IP' : 'Banned IPs', Colors.brown, () => Navigator.push(context, MaterialPageRoute(builder: (_) => BannedIpsScreen()))),
+                _buildActionBtn(context, Icons.analytics, LocalizationService().currentLanguage == 'vi' ? 'Lưu lượng' : 'Traffic', Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrafficMonitorScreen()))),
               ],
             ),
           ],
-          const SizedBox(height: 40),
+          SizedBox(height: 40),
         ],
       ),
     );
@@ -291,15 +378,15 @@ class _HomeScreenState extends State<HomeScreen> {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? color.withOpacity(0.12) : color.withOpacity(0.08),
+          color: isDark ? color.withValues(alpha: 0.12) : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 30, color: color),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Text(title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),

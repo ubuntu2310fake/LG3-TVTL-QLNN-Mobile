@@ -1,5 +1,6 @@
+import 'localization_service.dart';
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart'; 
@@ -71,8 +72,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (context) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(leading: const Icon(Icons.camera_alt), title: const Text('Chụp ảnh mới'), onTap: () => Navigator.pop(context, ImageSource.camera)),
-          ListTile(leading: const Icon(Icons.photo_library), title: const Text('Chọn từ thư viện'), onTap: () => Navigator.pop(context, ImageSource.gallery)),
+          ListTile(leading: Icon(Icons.camera_alt), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chụp ảnh mới' : 'Chup anh moi'), onTap: () => Navigator.pop(context, ImageSource.camera)),
+          ListTile(leading: Icon(Icons.photo_library), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chọn từ thư viện' : 'Chon tu thu vien'), onTap: () => Navigator.pop(context, ImageSource.gallery)),
       ]))
     );
     if (source == null) return;
@@ -84,7 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) _cropPickedImage(image.path);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Lỗi chọn ảnh: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi chọn ảnh: $e' : '❌ Error selecting image: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -96,12 +97,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // Ép vuông
         uiSettings: [
           AndroidUiSettings(
-              toolbarTitle: 'Cắt ảnh đại diện',
+              toolbarTitle: LocalizationService().currentLanguage == 'vi' ? 'Cắt ảnh đại diện' : 'Cat anh dai dien',
               toolbarColor: Theme.of(context).colorScheme.primary,
               toolbarWidgetColor: Colors.white,
               initAspectRatio: CropAspectRatioPreset.square,
               lockAspectRatio: true), 
-          IOSUiSettings(title: 'Cắt ảnh đại diện', aspectRatioLockEnabled: true),
+          IOSUiSettings(title: LocalizationService().currentLanguage == 'vi' ? 'Cắt ảnh đại diện' : 'Cat anh dai dien', aspectRatioLockEnabled: true),
         ],
       );
 
@@ -109,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) _uploadCroppedAvatar(croppedFile.path);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Lỗi cắt ảnh: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi cắt ảnh: $e' : '❌ Error cropping image: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -134,15 +135,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (response.statusCode == 200 && data['status'] == 'success') {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã đổi Avatar thành công!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã đổi Avatar thành công!' : '✅ Avatar changed successfully!'), backgroundColor: Colors.green));
         setState(() { 
           String newUrl = data['new_avatar_url'] ?? 'static/default.png';
-          _userData!['avatar'] = "${AppConfig.baseUrl}" + newUrl; 
+          _userData!['avatar'] = "${AppConfig.baseUrl}$newUrl"; 
         });
-      } else { throw Exception(data['msg'] ?? "Lỗi upload"); }
+      } else { throw Exception(data['msg'] ?? (LocalizationService().currentLanguage == 'vi' ? "Lỗi upload" : "Upload error")); }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Lỗi tải ảnh: $e'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '❌ Lỗi tải ảnh: $e' : '❌ Error loading image: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
@@ -152,10 +153,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Xác nhận'), content: const Text('Bạn muốn xóa ảnh đại diện?'),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận' : 'Confirm'), content: Text(LocalizationService().currentLanguage == 'vi' ? 'Bạn muốn xóa ảnh đại diện?' : 'Ban muon xoa anh dai dien?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Xóa', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa' : 'Xoa', style: TextStyle(color: Colors.red))),
         ],
       )
     );
@@ -173,10 +174,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final data = jsonDecode(res.body);
       if (data['status'] == 'success') {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Đã xóa ảnh đại diện!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã xóa ảnh đại diện!' : '✅ Da xoa anh dai dien!'), backgroundColor: Colors.green));
         setState(() { _userData!['avatar'] = "${AppConfig.baseUrl}/static/default.png"; });
       }
-    } catch(e) {} finally {
+    } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
   }
@@ -185,10 +186,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Xác nhận'), content: Text('Đăng xuất khỏi $deviceName?'),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận' : 'Confirm'), content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đăng xuất khỏi $deviceName?' : 'Dang xuat khoi $deviceName?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Đăng xuất', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Đăng xuất' : 'Dang xuat', style: TextStyle(color: Colors.red))),
         ],
       )
     );
@@ -210,7 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _toggleNotification(bool value) async {
-    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (c) => Center(child: CircularProgressIndicator()));
     final prefs = await SharedPreferences.getInstance();
     final sessionId = prefs.getString('phpsessid') ?? '';
     try {
@@ -256,18 +257,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_userData == null) return const Scaffold(body: Center(child: Text('Lỗi tải dữ liệu.')));
+    if (_isLoading) return Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_userData == null) return Scaffold(body: Center(child: Text(LocalizationService().currentLanguage == 'vi' ? 'Không thể tải dữ liệu. Vui lòng kiểm tra kết nối mạng!' : 'Unable to load data. Please check your network connection!')));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Hồ sơ cá nhân', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Hồ sơ cá nhân' : 'Personal Profile', style: TextStyle(fontWeight: FontWeight.bold))),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120), // FIX: Prevent bottom nav overlap
         child: Column(
           children: [
             Card(
-              elevation: 0, color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.2))),
+              elevation: 0, color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2))),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -277,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         // ĐÃ BỎ "padding: const EdgeInsets.all(3)" GÂY LỖI
                         CircleAvatar(radius: 55, backgroundColor: Colors.white,
-                          child: CircleAvatar(radius: 52, backgroundImage: NetworkImage(_userData!['avatar']), backgroundColor: Colors.grey.shade200),
+                          child: CircleAvatar(radius: 52, backgroundImage: NetworkImage(_userData!['avatar'].toString().startsWith('http') ? _userData!['avatar'] : "${AppConfig.baseUrl}${_userData!['avatar']}"), backgroundColor: Colors.grey.shade200),
                         ),
                         if (_isUploadingAvatar)
                           const CircleAvatar(radius: 55, backgroundColor: Colors.black54, child: CircularProgressIndicator(color: Colors.white)),
@@ -286,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: GestureDetector(
                             onTap: _isUploadingAvatar ? null : _startAvatarChangeProcess, // GỌI HÀM MỚI
                             child: CircleAvatar(radius: 18, backgroundColor: Theme.of(context).colorScheme.primary,
-                              child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                              child: Icon(Icons.camera_alt, size: 18, color: Colors.white),
                             ),
                           ),
                         ),
@@ -303,39 +304,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     Text(_userData!['full_name'] ?? _userData!['username'], style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     if (_studentData != null) ...[
                       Text('${_studentData!['class_name']} - ${_userData!['username']}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 16)),
                     ] else ...[
-                      Text('Quyền: ${_userData!['role']}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 15)),
-                    ],
+                      Text(LocalizationService().currentLanguage == "vi" ? "Quyền: ${_userData!['role']}" : "Role: ${_userData!['role']}", style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 15)),
                   ],
+                    ],
                 ),
               ),
             ),
             
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Card(
               elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.orange.shade300)),
               child: SwitchListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 secondary: Icon(_isThisDevicePushEnabled ? Icons.notifications_active : Icons.notifications_off, color: _isThisDevicePushEnabled ? Colors.orange : Colors.grey),
-                title: const Text('Nhận thông báo máy này', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Báo điểm trừ, cảnh báo AI Python'),
+                title: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhận thông báo máy này' : 'Receive push notifications', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(LocalizationService().currentLanguage == 'vi' ? 'Báo điểm trừ, cảnh báo AI Python' : 'Penalty points, AI warnings'),
                 value: _isThisDevicePushEnabled,
-                activeColor: Colors.orange,
+                activeThumbColor: Colors.orange,
                 onChanged: _toggleNotification,
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Card(
               elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(padding: EdgeInsets.all(16), child: Text('Lịch sử đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                  Padding(padding: EdgeInsets.all(16), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lịch sử đăng nhập' : 'Login History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
                   const Divider(height: 1),
                   ListView.separated(
                     shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
@@ -347,15 +348,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       String displayModel = !empty(dev['device_model']) ? dev['device_model'] : dev['device_name'];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: isCurrent ? Colors.green.withOpacity(0.1) : Colors.grey.shade100,
+                          backgroundColor: isCurrent ? Colors.green.withValues(alpha: 0.1) : Colors.grey.shade100,
                           child: Icon(_getDeviceIcon(dev['user_agent'], displayModel, dev['platform'] ?? 'web'), color: isCurrent ? Colors.green : Colors.grey, size: 20),
                         ),
                         title: Row(children: [
                             Expanded(child: Text(displayModel, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600, color: isCurrent ? Colors.green : null))),
-                            if (dev['push_enabled'] == 1) const Icon(Icons.notifications_active, color: Colors.orange, size: 16),
+                            if (dev['push_enabled'] == 1) Icon(Icons.notifications_active, color: Colors.orange, size: 16),
                         ]),
-                        subtitle: Text('HĐ cuối: ${dev['last_active']}\n${isCurrent ? 'Máy này' : 'Thiết bị khác'}', style: const TextStyle(fontSize: 12)),
-                        trailing: !isCurrent ? IconButton(icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () => _kickDevice(dev['session_id'], displayModel)) : null,
+                        subtitle: Text(LocalizationService().currentLanguage == "vi" ? "Đăng nhập: ${dev['created_at']}" : "Login: ${dev['created_at']}", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        trailing: !isCurrent ? IconButton(icon: Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () => _kickDevice(dev['session_id'], displayModel)) : null,
                       );
                     },
                   ),

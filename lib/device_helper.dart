@@ -1,3 +1,4 @@
+import 'localization_service.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -16,7 +17,7 @@ class DeviceHelper {
         return iosInfo.utsname.machine ?? "iPhone"; 
       }
     } catch (e) {
-      print("Lỗi lấy device info: $e");
+      print(LocalizationService().currentLanguage == 'vi' ? "Lỗi lấy device info: $e" : "Error getting device info: $e");
     }
     return Platform.isAndroid ? "Android Device" : "iOS Device";
   }
