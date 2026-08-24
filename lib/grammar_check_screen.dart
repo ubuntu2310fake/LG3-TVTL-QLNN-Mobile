@@ -137,7 +137,11 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
 
       final res = await dio.post(
         '${AppConfig.baseUrl}/grammar_check.php?local_api=1',
-        data: {'user_text': _textController.text, 'language': _currentLang},
+        data: {
+          'user_text': _textController.text,
+          'language': _currentLang,
+          'app_lang': LocalizationService().currentLanguage,
+        },
       );
 
       if (res.statusCode == 200 && res.data['status'] == 'success') {
@@ -235,14 +239,17 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
               children: [
                 Icon(Icons.auto_awesome, color: Colors.blue),
                 SizedBox(width: 8),
-                Text(LocalizationService().currentLanguage == 'vi' ? 'Đề xuất từ AI' : 'De xuat tu AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
+                Text(LocalizationService().currentLanguage == 'vi' ? 'Đề xuất từ AI' : 'AI Suggestion', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
               ],
             ),
             SizedBox(height: 15),
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 Text(issue.wrong, style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.red, fontSize: 18)),
-                Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Icon(Icons.arrow_right_alt, color: Colors.grey)),
+                const Icon(Icons.arrow_right_alt, color: Colors.grey),
                 Text(issue.correct, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 18)),
               ],
             ),
@@ -256,7 +263,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: Text(LocalizationService().currentLanguage == 'vi' ? 'Bỏ qua' : 'Bo qua', style: TextStyle(color: Colors.grey)),
+                    child: Text(LocalizationService().currentLanguage == 'vi' ? 'Bỏ qua' : 'Ignore', style: TextStyle(color: Colors.grey)),
                   ),
                 ),
                 Expanded(
@@ -330,7 +337,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
               maxLines: 12,
               style: TextStyle(fontSize: 16, color: isDark ? Colors.white : Colors.black),
               decoration: InputDecoration(
-                hintText: _currentLang == 'en' ? 'Enter text to check...' : LocalizationService().currentLanguage == 'vi' ? 'Nhập đoạn văn (VD: hôm lay tôi nàm bài suất xắc)...' : 'Nhap doan van (VD: hom lay toi nam bai suat xac)...',
+                hintText: _currentLang == 'en' ? 'Enter text to check...' : LocalizationService().currentLanguage == 'vi' ? 'Nhập đoạn văn (VD: hôm lay tôi nàm bài suất xắc)...' : 'Enter text (e.g. today I will do great)...',
                 hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
                 filled: true,
                 fillColor: Theme.of(context).cardColor,
@@ -350,7 +357,7 @@ class _GrammarCheckScreenState extends State<GrammarCheckScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 icon: _isScanning ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.auto_awesome),
-                label: Text(_isScanning ? LocalizationService().currentLanguage == 'vi' ? 'Đang phân tích AI...' : 'Dang phan tich AI...' : LocalizationService().currentLanguage == 'vi' ? 'Quét lỗi (Scan)' : 'Scan Errors', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                label: Text(_isScanning ? LocalizationService().currentLanguage == 'vi' ? 'Đang phân tích AI...' : 'AI Analyzing...' : LocalizationService().currentLanguage == 'vi' ? 'Quét lỗi (Scan)' : 'Scan Errors', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 onPressed: _isScanning ? null : _scanText,
               ),
             )

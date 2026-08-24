@@ -42,7 +42,7 @@ class _AiConsultingScreenState extends State<AiConsultingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Góc Tư Vấn AI' : 'AI Counseling Corner', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Góc tư vấn' : 'Counseling Corner', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: isDark ? Colors.purple.withValues(alpha: 0.1) : Colors.purple.shade50,
       ),
       body: SingleChildScrollView(

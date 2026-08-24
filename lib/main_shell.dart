@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:ui'; 
 import 'dart:async'; 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'localization_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -241,6 +242,326 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
+  bool _isForceChangePassShown = false;
+
+  Future<void> _checkForceChangePassword() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool mustChange = prefs.getBool('must_change_password') ?? false;
+    
+    if (!mustChange) {
+      try {
+        final sessionId = prefs.getString('phpsessid') ?? '';
+        if (sessionId.isNotEmpty) {
+          final res = await http.get(
+            Uri.parse('${AppConfig.baseUrl}/api/profile_api.php'),
+            headers: {'Cookie': 'PHPSESSID=$sessionId'},
+          );
+          if (res.statusCode == 200) {
+            final data = jsonDecode(res.body);
+            if (data['user'] != null && data['user']['must_change_password'] == true) {
+              mustChange = true;
+              await prefs.setBool('must_change_password', true);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (mustChange && mounted && !_isForceChangePassShown) {
+      _isForceChangePassShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showForceChangePasswordDialog();
+      });
+    }
+  }
+
+  void _showForceChangePasswordDialog() {
+    final oldPassCtrl = TextEditingController();
+    final newPassCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
+    bool obscureOld = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          bool isVi = LocalizationService().currentLanguage == 'vi';
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              title: Column(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.key_rounded, color: Colors.red, size: 32),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    isVi ? 'Yêu Cầu Đổi Mật Khẩu' : 'Password Change Required',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: GoogleFonts.beVietnamPro().fontFamily,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isVi
+                        ? 'Tài khoản của bạn đang sử dụng mật khẩu mặc định. Để bảo vệ dữ liệu cá nhân, vui lòng tạo mật khẩu mới để tiếp tục.'
+                        : 'Your account is using a default password. To protect your personal data, please create a new password to continue.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.normal,
+                      fontFamily: GoogleFonts.beVietnamPro().fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    // Mật khẩu hiện tại
+                    TextField(
+                      controller: oldPassCtrl,
+                      obscureText: obscureOld,
+                      decoration: InputDecoration(
+                        labelText: isVi ? 'Mật khẩu hiện tại' : 'Current password',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureOld ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setDialogState(() => obscureOld = !obscureOld),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Mật khẩu mới
+                    TextField(
+                      controller: newPassCtrl,
+                      obscureText: obscureNew,
+                      decoration: InputDecoration(
+                        labelText: isVi ? 'Mật khẩu mới' : 'New password',
+                        prefixIcon: const Icon(Icons.lock_reset_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isVi
+                          ? '🔒 Yêu cầu: Ít nhất 6 ký tự, gồm chữ hoa (A-Z), chữ thường (a-z), số (0-9) và ký tự đặc biệt (!@#...).'
+                          : '🔒 Required: At least 6 chars, incl. uppercase (A-Z), lowercase (a-z), numbers (0-9) and special chars (!@#...).',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 14),
+                    // Nhập lại mật khẩu mới
+                    TextField(
+                      controller: confirmPassCtrl,
+                      obscureText: obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: isVi ? 'Xác nhận mật khẩu mới' : 'Confirm new password',
+                        prefixIcon: const Icon(Icons.check_circle_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF005FBA),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            String oldP = oldPassCtrl.text.trim();
+                            String newP = newPassCtrl.text;
+                            String confirmP = confirmPassCtrl.text;
+
+                            if (oldP.isEmpty || newP.isEmpty || confirmP.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Vui lòng điền đủ tất cả các trường!' : '❌ Please fill in all fields!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (newP != confirmP) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu xác nhận không khớp!' : '❌ Passwords do not match!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (newP == '123456') {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu mới không được là 123456!' : '❌ New password cannot be 123456!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (newP.length < 6) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu phải có ít nhất 6 ký tự!' : '❌ Password must be at least 6 characters!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (!RegExp(r'[A-Z]').hasMatch(newP)) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu phải chứa ít nhất 1 chữ cái viết hoa (A-Z)!' : '❌ Must contain at least 1 uppercase letter (A-Z)!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (!RegExp(r'[a-z]').hasMatch(newP)) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu phải chứa ít nhất 1 chữ cái viết thường (a-z)!' : '❌ Must contain at least 1 lowercase letter (a-z)!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (!RegExp(r'[0-9]').hasMatch(newP)) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu phải chứa ít nhất 1 chữ số (0-9)!' : '❌ Must contain at least 1 digit (0-9)!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            if (!RegExp(r'[^A-Za-z0-9]').hasMatch(newP)) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(isVi ? '❌ Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt (!@#...)!' : '❌ Must contain at least 1 special character (!@#...)!'),
+                                backgroundColor: Colors.red,
+                              ));
+                              return;
+                            }
+
+                            setDialogState(() => isSubmitting = true);
+
+                            try {
+                              final prefs = await SharedPreferences.getInstance();
+                              final sessionId = prefs.getString('phpsessid') ?? '';
+                              final res = await http.post(
+                                Uri.parse('${AppConfig.baseUrl}/api/change_password_api.php'),
+                                headers: {'Cookie': 'PHPSESSID=$sessionId'},
+                                body: {
+                                  'action': 'change_password',
+                                  'old_password': oldP,
+                                  'new_password': newP,
+                                  'confirm_password': confirmP,
+                                },
+                              );
+                              final data = jsonDecode(res.body);
+                              if (data['status'] == 'success') {
+                                await prefs.setBool('must_change_password', false);
+                                _isForceChangePassShown = false;
+                                if (mounted) {
+                                  Navigator.of(dialogCtx, rootNavigator: true).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text(isVi ? '✅ Đổi mật khẩu thành công!' : '✅ Password changed successfully!'),
+                                    backgroundColor: Colors.green,
+                                  ));
+                                }
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text(data['msg'] ?? (isVi ? 'Đổi mật khẩu thất bại!' : 'Failed to change password!')),
+                                    backgroundColor: Colors.red,
+                                  ));
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text(isVi ? 'Lỗi kết nối máy chủ' : 'Server connection error'),
+                                  backgroundColor: Colors.red,
+                                ));
+                              }
+                            } finally {
+                              setDialogState(() => isSubmitting = false);
+                            }
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.save, size: 20),
+                              const SizedBox(width: 8),
+                              Text(isVi ? 'LƯU VÀ TIẾP TỤC' : 'SAVE AND CONTINUE', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      Navigator.of(dialogCtx, rootNavigator: true).pop();
+                      _isForceChangePassShown = false;
+                      try {
+                        final prefs = await SharedPreferences.getInstance();
+                        await http.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+                        await prefs.clear();
+                      } catch (_) {}
+                      if (!mounted) return;
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                    },
+                    icon: const Icon(Icons.logout, size: 18, color: Colors.grey),
+                    label: Text(
+                      isVi ? 'Đăng xuất tài khoản' : 'Logout',
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -250,6 +571,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _localAvatarPath = prefs.getString('local_avatar_path') ?? '';
     });
     
+    // Kiểm tra xem có bắt buộc đổi mật khẩu mặc định hay không
+    _checkForceChangePassword();
+
     // Asynchronously sync avatar and master data
     try {
       final sessionId = prefs.getString('phpsessid') ?? '';
@@ -587,7 +911,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     } else {
       switch (_currentIndex) {
         case 0: return LocalizationService().currentLanguage == 'vi' ? 'Siêu ứng dụng LG3' : 'LG3 Super App';
-        case 1: return 'CHUYÊN GIA AI';
+        case 1: return 'GÓC TƯ VẤN';
         case 2: return 'BẢNG XẾP HẠNG';
         default: return 'LG3';
       }
@@ -645,8 +969,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           children: [
             UserAccountsDrawerHeader(
               decoration: BoxDecoration(color: isDark ? Colors.grey[900] : Theme.of(context).colorScheme.primary),
-              accountName: Text(_userName, style: const TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
-              accountEmail: Text(LocalizationService().currentLanguage == 'vi' ? 'Quyền: $_role' : 'Role: $_role', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.white70)),
+              accountName: Text(_userName, style: GoogleFonts.beVietnamPro(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+              accountEmail: Text(LocalizationService().currentLanguage == 'vi' ? 'Quyền: $_role' : 'Role: $_role', style: GoogleFonts.beVietnamPro(fontSize: 13, color: Colors.white70)),
               currentAccountPicture: CircleAvatar(
                 backgroundColor: isDark ? Colors.grey[800] : Colors.blue.shade100,
                 backgroundImage: (_localAvatarPath.isNotEmpty && File(_localAvatarPath).existsSync())
@@ -686,8 +1010,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     
                     ListTile(leading: Icon(Icons.explore, color: Colors.green), title: Text(T('career_advice', def: LocalizationService().currentLanguage == 'vi' ? 'Đánh giá Nghề nghiệp' : 'Career Assessment'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ConsultingTestScreen())); }),
                     ListTile(leading: Icon(Icons.games, color: Colors.orange), title: Text(T('chess_game', def: LocalizationService().currentLanguage == 'vi' ? 'Cờ Vua Multiplayer' : 'Multiplayer Chess')), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ChessLobbyScreen())); }),
-                    ListTile(leading: Icon(Icons.forum, color: Colors.blue), title: Text(T('counseling_corner', def: LocalizationService().currentLanguage == 'vi' ? 'Chat' : 'Chat'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => HumanChatListScreen())); }),
-                    ListTile(leading: Icon(Icons.psychology, color: Colors.purple), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chuyên gia AI' : 'AI Expert', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => AiConsultingScreen())); }),
+                    ListTile(leading: Icon(Icons.forum, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chat' : 'Chat', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => HumanChatListScreen())); }),
+                    ListTile(leading: Icon(Icons.psychology, color: Colors.purple), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Góc tư vấn' : 'Counseling Corner', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => AiConsultingScreen())); }),
 
                     if (['STUDENT', 'RED_FLAG'].contains(_role))
                       ListTile(leading: Icon(Icons.warning_amber, color: Colors.orange), title: Text(T('student_violations', def: LocalizationService().currentLanguage == 'vi' ? 'Lỗi của tôi / Sổ đầu bài' : 'My Violations / Logbook'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, fontWeight: FontWeight.w600)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => StudentViolationsScreen())); }),
@@ -763,7 +1087,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               ]
             : [
                 NavigationDestination(selectedIcon: Icon(Icons.home), icon: Icon(Icons.home_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Trang chủ' : 'Home'),
-                NavigationDestination(selectedIcon: Icon(Icons.psychology), icon: Icon(Icons.psychology_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Tư vấn AI' : 'AI Advice'),
+                NavigationDestination(selectedIcon: Icon(Icons.psychology), icon: Icon(Icons.psychology_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Góc tư vấn' : 'Counseling Corner'),
                 NavigationDestination(selectedIcon: Icon(Icons.workspace_premium), icon: Icon(Icons.workspace_premium_outlined), label: LocalizationService().currentLanguage == 'vi' ? 'Xếp hạng' : 'Ranking'),
               ],
         ),

@@ -29,10 +29,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   void _assignClass(int userId, String userName, int? currentClassId) {
     int? selectedClass = currentClassId;
     showDialog(context: context, builder: (c) => AlertDialog(
-      title: Text(LocalizationService().currentLanguage == 'vi' ? 'Phân công $userName' : 'Phan cong $userName'),
+      title: Text(LocalizationService().currentLanguage == 'vi' ? 'Phân công $userName' : 'Assign $userName'),
       content: DropdownButtonFormField<int>(
         initialValue: selectedClass,
-        decoration: InputDecoration(border: OutlineInputBorder(), labelText: LocalizationService().currentLanguage == 'vi' ? 'Chọn Lớp Chủ Nhiệm' : 'Chon Lop Chu Nhiem'),
+        decoration: InputDecoration(border: OutlineInputBorder(), labelText: LocalizationService().currentLanguage == 'vi' ? 'Chọn Lớp Chủ Nhiệm' : 'Select Homeroom Class'),
         items: [
           DropdownMenuItem<int>(value: null, child: Text(LocalizationService().currentLanguage == 'vi' ? '-- Không đứng lớp --' : '-- No class --')),
           ..._classes.map<DropdownMenuItem<int>>((cl) => DropdownMenuItem(value: cl['id'], child: Text(cl['name'])))
@@ -50,7 +50,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ ${data['msg']}'), backgroundColor: Colors.green));
             _fetchData();
           }
-        }, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu' : 'Luu')),
+        }, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu' : 'Save')),
       ],
     ));
   }
@@ -63,17 +63,17 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 
     showDialog(context: context, builder: (c) => StatefulBuilder(
       builder: (context, setStateSB) => AlertDialog(
-        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo Tài Khoản Mới' : 'Tao Tai Khoan Moi'),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Tạo Tài Khoản Mới' : 'Create New Account'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: userCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Tên đăng nhập (*)' : 'Ten dang nhap (*)', border: OutlineInputBorder())), SizedBox(height: 10),
-              TextField(controller: nameCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Họ và tên (*)' : 'Ho va ten (*)', border: OutlineInputBorder())), SizedBox(height: 10),
-              TextField(controller: passCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Mật khẩu (*)' : 'Mat khau (*)', border: OutlineInputBorder()), obscureText: true), SizedBox(height: 10),
+              TextField(controller: userCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Tên đăng nhập (*)' : 'Username (*)', border: OutlineInputBorder())), SizedBox(height: 10),
+              TextField(controller: nameCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Họ và tên (*)' : 'Full Name (*)', border: OutlineInputBorder())), SizedBox(height: 10),
+              TextField(controller: passCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Mật khẩu (*)' : 'Password (*)', border: OutlineInputBorder()), obscureText: true), SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                initialValue: role, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Quyền hạn' : 'Quyen han', border: OutlineInputBorder()),
-                items: [DropdownMenuItem(value: 'TEACHER', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Giáo Viên' : 'Giao Vien')), DropdownMenuItem(value: 'ADMIN', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Quản Trị Viên' : 'Quan Tri Vien'))],
+                initialValue: role, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Quyền hạn' : 'Role / Permissions', border: OutlineInputBorder()),
+                items: [DropdownMenuItem(value: 'TEACHER', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Giáo Viên' : 'Teacher')), DropdownMenuItem(value: 'ADMIN', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Quản Trị Viên' : 'Administrator'))],
                 onChanged: (v) => setStateSB(() => role = v!),
               ),
             ],

@@ -204,7 +204,7 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
             Tab(text: LocalizationService().currentLanguage == 'vi' ? 'Hành vi (DISC)' : 'Behavioral (DISC)'),
             Tab(text: LocalizationService().currentLanguage == 'vi' ? 'Động lực (MTVT)' : 'Motivators (MTVT)'),
             Tab(text: LocalizationService().currentLanguage == 'vi' ? '🕒 Lịch sử' : '🕒 History'),
-            Tab(text: LocalizationService().currentLanguage == 'vi' ? '🤖 Tư vấn AI' : '🤖 AI Counseling'),
+            Tab(text: LocalizationService().currentLanguage == 'vi' ? '🤖 Góc tư vấn' : '🤖 Counseling Corner'),
           ],
         ),
       ),

@@ -249,7 +249,7 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
                         icon: _isUploading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(Icons.check_circle),
-                        label: Text(_isUploading ? LocalizationService().currentLanguage == 'vi' ? 'Đang xử lý DB...' : 'Dang xu ly DB...' : LocalizationService().currentLanguage == 'vi' ? 'Bắt đầu Lưu vào DB' : 'Bat dau Luu vao DB'),
+                        label: Text(_isUploading ? LocalizationService().currentLanguage == 'vi' ? 'Đang xử lý DB...' : 'Processing database...' : LocalizationService().currentLanguage == 'vi' ? 'Bắt đầu Lưu vào DB' : 'Start Saving to DB'),
                         onPressed: (_selectedExamId != null && _selectedFile != null && !_isUploading) ? _uploadExcel : null,
                       ),
                     )
@@ -271,7 +271,7 @@ class _ManageExamsScreenState extends State<ManageExamsScreen> {
                     Text(LocalizationService().currentLanguage == 'vi' ? 'Lịch sử Kỳ thi' : 'Exam History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     SizedBox(height: 10),
                     if (_isLoadingExams) Center(child: CircularProgressIndicator()),
-                    if (!_isLoadingExams && _exams.isEmpty) Text(LocalizationService().currentLanguage == 'vi' ? 'Chưa có dữ liệu.' : 'Chua co du lieu.'),
+                    if (!_isLoadingExams && _exams.isEmpty) Text(LocalizationService().currentLanguage == 'vi' ? 'Chưa có dữ liệu.' : 'No data available.'),
                     if (!_isLoadingExams)
                       ..._exams.map((ex) => ListTile(
                         contentPadding: EdgeInsets.zero,

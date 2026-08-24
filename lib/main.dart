@@ -13,6 +13,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:workmanager/workmanager.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:app_links/app_links.dart';
+import 'public_profile_screen.dart';
 import 'offline_queue_service.dart';
 
 import 'login_screen.dart';
@@ -20,7 +22,7 @@ import 'main_shell.dart';
 import 'config.dart';
 import 'localization_service.dart';
 
-const String currentAppVersion = "2.0.1";
+const String currentAppVersion = "2.0.2";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 bool _isProcessingNoti = false;
@@ -153,10 +155,54 @@ void main() async {
     }
   }
 
+  // Khởi tạo App Links
+  final _appLinks = AppLinks();
+  
+  Future.delayed(Duration(seconds: 2), () async {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        if (initialUri.host.endsWith('testifiyonline.xyz')) {
+          final pathSegments = initialUri.pathSegments;
+          if (pathSegments.isNotEmpty) {
+            String possibleCode = pathSegments.first.toUpperCase();
+            if (RegExp(r'^K\d{2}A\d{1,2}\d{2,3}$').hasMatch(possibleCode)) {
+              if (navigatorKey.currentState != null) {
+                navigatorKey.currentState!.push(
+                  MaterialPageRoute(builder: (_) => PublicProfileScreen(studentCode: possibleCode)),
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  });
+
+  _appLinks.uriLinkStream.listen((uri) {
+    debugPrint('Received DeepLink: $uri');
+    if (uri.host.endsWith('testifiyonline.xyz')) {
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        String possibleCode = pathSegments.first.toUpperCase();
+        if (RegExp(r'^K\d{2}A\d{1,2}\d{2,3}$').hasMatch(possibleCode)) {
+          // It's a student code!
+          if (navigatorKey.currentState != null) {
+            navigatorKey.currentState!.push(
+              MaterialPageRoute(builder: (_) => PublicProfileScreen(studentCode: possibleCode)),
+            );
+          }
+        }
+      }
+    }
+  });
+
   runApp(const LG3App());
 }
 
 
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class LG3App extends StatelessWidget {
   const LG3App({super.key});
@@ -169,7 +215,7 @@ class LG3App extends StatelessWidget {
         return ValueListenableBuilder<String>(
           valueListenable: LocalizationService().languageNotifier,
           builder: (context, lang, child) {
-            return MaterialApp(key: ValueKey(lang),
+            return MaterialApp(key: ValueKey(lang), navigatorKey: navigatorKey,
           title: LocalizationService().currentLanguage == 'vi' ? 'LG3 Quản Lý Nền Nếp' : 'LG3 Quan Ly Nen Nep',
           debugShowCheckedModeBanner: false,
           themeMode: currentMode,

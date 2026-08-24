@@ -46,7 +46,7 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
         title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận' : 'Confirm'), content: Text(LocalizationService().currentLanguage == 'vi' ? 'Bạn muốn mở khóa cho IP $ip?' : 'Do you want to unban IP $ip?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Mở khóa' : 'Mo khoa', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Mở khóa' : 'Unban', style: TextStyle(color: Colors.red))),
         ],
       )
     );
@@ -62,7 +62,7 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
       );
       final data = jsonDecode(response.body);
       if (data['status'] == 'success' && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã mở khóa IP!' : '✅ Da mo khoa IP!'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '✅ Đã mở khóa IP!' : '✅ IP Unbanned!'), backgroundColor: Colors.green));
         _fetchIps();
       }
     } catch (e) {}
@@ -119,7 +119,7 @@ class _BannedIpsScreenState extends State<BannedIpsScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(color: isExpired ? Colors.green.shade50 : Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                                child: Text(isExpired ? LocalizationService().currentLanguage == 'vi' ? 'Đã hết hạn' : 'Da het han' : LocalizationService().currentLanguage == 'vi' ? 'Đang khóa' : 'Dang khoa', style: TextStyle(color: isExpired ? Colors.green : Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
+                                child: Text(isExpired ? LocalizationService().currentLanguage == 'vi' ? 'Đã hết hạn' : 'Expired' : LocalizationService().currentLanguage == 'vi' ? 'Đang khóa' : 'Active Block', style: TextStyle(color: isExpired ? Colors.green : Colors.red, fontSize: 12, fontWeight: FontWeight.bold)),
                               )
                             ],
                           ),

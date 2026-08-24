@@ -107,7 +107,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 if (mounted) Navigator.pop(context);
                 _fetchData();
               },
-              child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu' : 'Luu'),
+              child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu' : 'Save'),
             )
           ]
         );

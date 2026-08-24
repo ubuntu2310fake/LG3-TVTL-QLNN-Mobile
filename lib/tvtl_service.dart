@@ -241,4 +241,40 @@ class TvtlService {
     } catch (e) { print(LocalizationService().currentLanguage == 'vi' ? "Lỗi respondFriend: $e" : "Error respondFriend: $e"); }
     return false;
   }
+
+  // Hủy lời mời kết bạn đã gửi
+  static Future<bool> cancelFriendRequest(int targetId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final phpSession = prefs.getString('phpsessid') ?? '';
+      final cookieHeader = 'PHPSESSID=$phpSession';
+      final res = await http.post(
+        Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/cancel'),
+        headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
+        body: jsonEncode({'target_id': targetId}),
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body)['success'] == true;
+      }
+    } catch (e) { print(LocalizationService().currentLanguage == 'vi' ? "Lỗi cancelFriendRequest: $e" : "Error cancelFriendRequest: $e"); }
+    return false;
+  }
+
+  // Hủy kết bạn (Unfriend)
+  static Future<bool> unfriend(int targetId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final phpSession = prefs.getString('phpsessid') ?? '';
+      final cookieHeader = 'PHPSESSID=$phpSession';
+      final res = await http.post(
+        Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/unfriend'),
+        headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
+        body: jsonEncode({'target_id': targetId}),
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body)['success'] == true;
+      }
+    } catch (e) { print(LocalizationService().currentLanguage == 'vi' ? "Lỗi unfriend: $e" : "Error unfriend: $e"); }
+    return false;
+  }
 }

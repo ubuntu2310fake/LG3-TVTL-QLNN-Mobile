@@ -70,7 +70,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
             icon: Icon(Icons.qr_code_2),
             tooltip: LocalizationService().currentLanguage == 'vi' ? 'Tải mã QR (.zip)' : 'Tai ma QR (.zip)',
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đang tạo và tải file mã QR (.zip)...' : 'Dang tao va tai file ma QR (.zip)...')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đang tạo và tải file mã QR (.zip)...' : 'Generating and downloading QR code (.zip)...')));
             }
           )
         ],
@@ -89,7 +89,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                 Expanded(child: DropdownButtonFormField<String>(
                   decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 10)),
                   initialValue: _classId.isEmpty ? null : _classId, hint: Text(LocalizationService().currentLanguage == 'vi' ? 'Tất cả lớp' : 'All classes'),
-                  items: [DropdownMenuItem(value: '', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tất cả' : 'Tat ca')), ..._classes.map((c) => DropdownMenuItem(value: c['id'].toString(), child: Text(c['name'])))],
+                  items: [DropdownMenuItem(value: '', child: Text(LocalizationService().currentLanguage == 'vi' ? 'Tất cả' : 'All')), ..._classes.map((c) => DropdownMenuItem(value: c['id'].toString(), child: Text(c['name'])))],
                   onChanged: (v) { setState(() => _classId = v!); _fetchData(page: 1); },
                 )),
               ],

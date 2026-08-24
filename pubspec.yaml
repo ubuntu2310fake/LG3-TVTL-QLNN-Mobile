@@ -1,12 +1,13 @@
 name: lg3_tvtl_qlnn
 description: "Phần mềm tư vấn tâm lý và quản lý thi đua - trường THPT Lạng Giang 3"
 publish_to: 'none'
-version: 2.0.1+7
+version: 2.0.2+8
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
 
 dependencies:
+  url_launcher: ^6.3.0
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
@@ -36,8 +37,10 @@ dependencies:
   flutter_markdown: ^0.7.7+1
   google_fonts: ^8.2.1
   flutter_chess_board: ^1.0.1
+  app_links: ^7.2.1
 
 dev_dependencies:
+  url_launcher: ^6.3.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0

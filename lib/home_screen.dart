@@ -319,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildActionBtn(context, Icons.explore, LocalizationService().currentLanguage == 'vi' ? 'Nghề nghiệp' : 'Career Test', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConsultingTestScreen()))),
               _buildActionBtn(context, Icons.forum, LocalizationService().currentLanguage == 'vi' ? 'Chat' : 'Chat', Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => HumanChatListScreen()))),
-              _buildActionBtn(context, Icons.psychology, LocalizationService().currentLanguage == 'vi' ? 'Chuyên gia AI' : 'AI Expert', Colors.purple, () => isStaff ? Navigator.push(context, MaterialPageRoute(builder: (_) => AiConsultingScreen())) : widget.onNavigate(1)),
+              _buildActionBtn(context, Icons.psychology, LocalizationService().currentLanguage == 'vi' ? 'Góc tư vấn' : 'Counseling Corner', Colors.purple, () => isStaff ? Navigator.push(context, MaterialPageRoute(builder: (_) => AiConsultingScreen())) : widget.onNavigate(1)),
             ],
           ),
   
