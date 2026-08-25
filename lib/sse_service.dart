@@ -168,7 +168,7 @@ class SseService {
         final studentCode = (data['student_code'] ?? '').toString().trim();
         final className = data['class_name'] ?? '';
         final classId = int.tryParse((data['class_id'] ?? '0').toString()) ?? 0;
-        final totalPoints = data['total_points'] ?? 0;
+        final totalPoints = data['total_points'] ?? data['recorded_points'] ?? 0;
         final errorsStr = data['errors_str'] ?? (data['display_name'] ?? '');
         final reporter = data['reporter_fullname'] ?? (data['reporter'] ?? 'Người chấm');
 

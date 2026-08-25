@@ -335,9 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildActionBtn(context, Icons.fact_check, LocalizationService().currentLanguage == 'vi' ? 'Kiểm tra Lớp' : 'Class Check', Colors.amber, () => widget.onNavigate(2)),
                 _buildActionBtn(context, Icons.co_present, LocalizationService().currentLanguage == 'vi' ? 'Lớp của tôi' : 'My Class', Colors.deepOrange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => TeacherDashboardScreen()))),
                 _buildActionBtn(context, Icons.edit_note, LocalizationService().currentLanguage == 'vi' ? 'Nhập điểm học tập' : 'Academic Scores', Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (_) => InputAcademicScreen()))),
-                _buildActionBtn(context, Icons.gavel, LocalizationService().currentLanguage == 'vi' ? 'QL Vi phạm' : 'Manage Violations', Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageViolationsScreen()))),
                 _buildActionBtn(context, Icons.history, LocalizationService().currentLanguage == 'vi' ? 'LS Vi phạm' : 'Violation History', Colors.deepPurple, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ViolationHistoryScreen()))),
-                _buildActionBtn(context, Icons.task, LocalizationService().currentLanguage == 'vi' ? 'QL Kỳ thi' : 'Manage Exams', Colors.pink, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageExamsScreen()))),
                 _buildActionBtn(context, Icons.file_download, LocalizationService().currentLanguage == 'vi' ? 'Xuất báo cáo Excel' : 'Export Excel', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExportReportScreen()))),
               ],
             ),
@@ -351,6 +349,8 @@ class _HomeScreenState extends State<HomeScreen> {
               shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.0,
               children: [
+                _buildActionBtn(context, Icons.gavel, LocalizationService().currentLanguage == 'vi' ? 'QL Vi phạm' : 'Manage Violations', Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageViolationsScreen()))),
+                _buildActionBtn(context, Icons.task, LocalizationService().currentLanguage == 'vi' ? 'QL Kỳ thi' : 'Manage Exams', Colors.pink, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageExamsScreen()))),
                 _buildActionBtn(context, Icons.people_alt, LocalizationService().currentLanguage == 'vi' ? 'Học sinh' : 'Students', Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageStudentsScreen()))),
                 _buildActionBtn(context, Icons.admin_panel_settings, LocalizationService().currentLanguage == 'vi' ? 'Tài khoản' : 'Accounts', Colors.redAccent, () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageUsersScreen()))),
                 _buildActionBtn(context, Icons.security, LocalizationService().currentLanguage == 'vi' ? 'Khóa IP' : 'Banned IPs', Colors.brown, () => Navigator.push(context, MaterialPageRoute(builder: (_) => BannedIpsScreen()))),

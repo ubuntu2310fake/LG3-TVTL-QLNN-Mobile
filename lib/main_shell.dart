@@ -793,18 +793,26 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
     // 2. Lớp của tôi (GVCN / Học sinh cùng lớp / Cảnh báo tâm lý gửi GVCN)
     else if (action == 'open_my_class' || url.contains('teacher_dashboard') || url.contains('my_class')) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
+      if (_isStaff) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()));
+      }
     }
     // 3. Lịch sử vi phạm (GV không chủ nhiệm / Admin)
     else if (action == 'open_violation_history' || url.contains('violation_history')) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen()));
+      if (_isStaff) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ViolationHistoryScreen()));
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()));
+      }
     }
     // 4. Trực cổng / Kiểm tra cổng
     else if (action == 'open_gate_check' || url.contains('gate_check')) {
       if (_isStaff) {
         setState(() => _currentIndex = 1);
       } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const GateCheckScreen()));
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()));
       }
     }
     // 5. Kiểm tra lớp
@@ -812,7 +820,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       if (_isStaff) {
         setState(() => _currentIndex = 2);
       } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassCheckScreen()));
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentViolationsScreen()));
       }
     }
     // 6. Chat tư vấn tâm lý / Bạn bè
@@ -829,7 +837,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
     // 9. Cảnh báo tâm lý fallback
     else if (action == 'open_psychology_alert') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
+      if (_isStaff) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
+      }
     }
     // 10. Thách đấu Cờ Vua
     else if (action == 'open_chess' || url.contains('chess') || type == 'CHESS_CHALLENGE') {
