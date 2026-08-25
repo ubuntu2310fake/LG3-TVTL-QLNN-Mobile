@@ -38,9 +38,9 @@ class _HumanChatListScreenState extends State<HumanChatListScreen> {
     await TvtlService.ensurePythonLogin();
 
     if (_role == 'TEACHER' || _role == 'ADMIN') {
-      _contacts = await TvtlService.getConversations() ?? [];
+      _contacts = await TvtlService.getConversations();
     } else {
-      _contacts = await TvtlService.getTeachers() ?? [];
+      _contacts = await TvtlService.getTeachers();
       final fData = await TvtlService.getFriendsData();
       if (fData != null) _friendsData = fData;
     }
@@ -112,7 +112,10 @@ class _HumanChatListScreenState extends State<HumanChatListScreen> {
               : Icon(Icons.chevron_right, color: Colors.grey),
           onTap: () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => HumanChatRoomScreen(
-              partnerId: idStr, partnerName: c['full_name'] ?? c['partner_name'], partnerAvatar: _fixAvatarUrl(c['avatar'] ?? ''),
+              partnerId: idStr,
+              partnerName: c['full_name'] ?? c['partner_name'],
+              partnerAvatar: _fixAvatarUrl(c['avatar'] ?? ''),
+              isTeacher: (_role == 'STUDENT'),
             ))).then((_) => _initData());
           }
         );

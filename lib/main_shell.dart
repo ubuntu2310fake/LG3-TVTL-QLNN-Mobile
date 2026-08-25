@@ -691,9 +691,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             if (!isInit && isNotiEnabled && !forceReload) {
               final dt = DateTime.parse(n['time']);
               if (DateTime.now().difference(dt).inSeconds < 60) {
-                Future.delayed(Duration(milliseconds: delayMs), () {
-                  if (mounted) _showInAppNotification(n['title'], n['body'], nid, n['data'] ?? {});
-                });
+                final notiData = Map<String, dynamic>.from(n['data'] ?? {});
+                final type = (notiData['type'] ?? '').toString();
+                if (type == 'CHESS_CHALLENGE') {
+                  Future.delayed(Duration(milliseconds: delayMs), () {
+                    if (mounted) _showChessChallengeDialog(notiData);
+                  });
+                } else {
+                  Future.delayed(Duration(milliseconds: delayMs), () {
+                    if (mounted) _showInAppNotification(n['title'], n['body'], nid, notiData);
+                  });
+                }
                 delayMs += 800; 
               }
             }
@@ -822,6 +830,78 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     else if (action == 'open_psychology_alert') {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherDashboardScreen()));
     }
+    // 10. Thách đấu Cờ Vua
+    else if (action == 'open_chess' || url.contains('chess') || type == 'CHESS_CHALLENGE') {
+      final matchId = (data['target_id'] ?? data['match_id'] ?? '').toString();
+      if (matchId.isNotEmpty) {
+        _showChessChallengeDialog(data);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ChessLobbyScreen()));
+      }
+    }
+  }
+
+  void _showChessChallengeDialog(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final matchId = (data['target_id'] ?? data['match_id'] ?? '').toString();
+    final challengerName = (data['challenger_name'] ?? data['title'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Đối thủ' : 'Opponent')).toString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.sports_esports_rounded, color: Colors.orange, size: 40),
+        title: Text(LocalizationService().currentLanguage == 'vi' ? 'Thách đấu Cờ Vua' : 'Chess Challenge'),
+        content: Text(
+          LocalizationService().currentLanguage == 'vi'
+              ? '$challengerName muốn thách đấu cờ vua với bạn!'
+              : '$challengerName wants to challenge you to a chess match!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final prefs = await SharedPreferences.getInstance();
+              final sessionId = prefs.getString('phpsessid') ?? '';
+              http.post(
+                Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
+                headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=decline&match_id=$matchId',
+              );
+            },
+            child: Text(LocalizationService().currentLanguage == 'vi' ? 'Từ chối' : 'Decline'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final prefs = await SharedPreferences.getInstance();
+              final sessionId = prefs.getString('phpsessid') ?? '';
+              final res = await http.post(
+                Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
+                headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=accept&match_id=$matchId',
+              );
+              try {
+                final d = jsonDecode(res.body);
+                if (d['status'] == 'success') {
+                  if (mounted) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChessLobbyScreen(matchId: matchId)));
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d['msg'] ?? 'Error')));
+                  }
+                }
+              } catch (_) {
+                if (mounted) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => ChessLobbyScreen(matchId: matchId)));
+                }
+              }
+            },
+            child: Text(LocalizationService().currentLanguage == 'vi' ? 'Chấp nhận' : 'Accept'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showNotificationsPanel() {

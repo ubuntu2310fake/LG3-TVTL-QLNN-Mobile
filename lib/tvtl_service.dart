@@ -81,7 +81,7 @@ class TvtlService {
     return [];
   }
 
-  static Future<Map<String, dynamic>?> sendMessage(String content, {required String partnerId, int? replyId}) async {
+  static Future<Map<String, dynamic>?> sendMessage(String content, {required String partnerId, int? replyId, bool isAnonymous = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
@@ -92,6 +92,7 @@ class TvtlService {
         body: jsonEncode({
           'receiver_id': partnerId, 
           'content': content,
+          'is_anonymous': isAnonymous ? 1 : 0,
           // FIX: Ép kiểu reply_id sang int đúng chuẩn Database Python
           if (replyId != null) 'reply_id': replyId.toInt() 
         }),

@@ -267,7 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _socialInit = false;
 
-  Future<void> _apiPost(Map<String, String> body, Function(Map<String, dynamic>) onSuccess) async {
+  Future<void> _apiPost(Map<String, String> body, Function(Map<String, dynamic>) onSuccess, {bool showToast = true}) async {
     final prefs = await SharedPreferences.getInstance();
     final sessionId = prefs.getString('phpsessid') ?? '';
     try {
@@ -302,14 +302,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
 
         if (d['status'] == 'success') {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+          if (showToast && msg.trim().isNotEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+          }
           onSuccess(d);
         } else {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+          if (showToast && msg.trim().isNotEmpty && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+          }
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi kết nối' : 'Connection Error'), backgroundColor: Colors.red));
+      if (showToast && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi kết nối' : 'Connection Error'), backgroundColor: Colors.red));
     }
   }
 
@@ -338,7 +342,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final TextEditingController emailCtrl = TextEditingController();
+    final TextEditingController emailCtrl = TextEditingController(text: (_userData != null && _userData!['email'] != null) ? _userData!['email'].toString() : '');
     final TextEditingController otpCtrl = TextEditingController();
     bool step2 = false;
     showModalBottomSheet(
@@ -451,7 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         }
-      });
+      }, showToast: false);
     }
   }
 
@@ -629,11 +633,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Builder(
                     builder: (context) {
                       bool isEmailLinked = _userData != null && _userData!['email'] != null && _userData!['email'].toString().isNotEmpty && (_userData!['email_verified'] == 1 || _userData!['email_verified'] == '1' || _userData!['email_verified'] == true);
-                      String emailSub = isEmailLinked ? _userData!['email'] : (LocalizationService().currentLanguage == 'vi' ? 'Chưa liên kết' : 'Not linked');
+                      String emailSub = '';
+                      if (isEmailLinked) {
+                        emailSub = _userData!['email'];
+                      } else if (_userData != null && _userData!['email'] != null && _userData!['email'].toString().isNotEmpty) {
+                        emailSub = LocalizationService().currentLanguage == 'vi' ? 'Chưa xác thực: ${_userData!['email']}' : 'Unverified: ${_userData!['email']}';
+                      } else {
+                        emailSub = LocalizationService().currentLanguage == 'vi' ? 'Chưa liên kết' : 'Not linked';
+                      }
                       return ListTile(
                         leading: Icon(Icons.email, color: Colors.orange),
                         title: Text(LocalizationService().currentLanguage == 'vi' ? 'Liên kết Email' : 'Link Email'),
-                        subtitle: Text(emailSub, style: TextStyle(fontSize: 12, color: isEmailLinked ? Colors.green : Colors.grey)),
+                        subtitle: Text(emailSub, style: TextStyle(fontSize: 12, color: isEmailLinked ? Colors.green : (emailSub.contains(':') ? Colors.orange : Colors.grey))),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

@@ -21,8 +21,9 @@ import 'login_screen.dart';
 import 'main_shell.dart';
 import 'config.dart';
 import 'localization_service.dart';
+import 'device_helper.dart';
 
-const String currentAppVersion = "2.0.2";
+const String currentAppVersion = "2.0.3";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 bool _isProcessingNoti = false;
@@ -253,12 +254,18 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final rememberToken = prefs.getString('remember_token');
+    final oldSess = prefs.getString('phpsessid') ?? '';
+    final deviceName = await DeviceHelper.getDeviceModel();
 
     if (rememberToken != null && rememberToken.isNotEmpty) {
       try {
         final response = await http.post(
           Uri.parse('${AppConfig.baseUrl}/api/login_api.php'), 
-          body: {'remember_token': rememberToken}
+          body: {
+            'remember_token': rememberToken,
+            'device_name': deviceName,
+            'old_session_id': oldSess,
+          }
         ).timeout(const Duration(seconds: 5));
         final data = jsonDecode(response.body);
         if (response.statusCode == 200 && data['status'] == 'success') {
@@ -267,8 +274,7 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       } catch (e) {
         debugPrint('Auto login failed/timeout: $e');
-        final oldSess = prefs.getString('phpsessid');
-        if (oldSess != null && oldSess.isNotEmpty) {
+        if (oldSess.isNotEmpty) {
           if (!mounted) return; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell())); return;
         }
       }

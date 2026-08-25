@@ -5,7 +5,9 @@ import 'config.dart';
 import 'localization_service.dart';
 
 class ChessLobbyScreen extends StatefulWidget {
-  const ChessLobbyScreen({super.key});
+  final String? matchId;
+
+  const ChessLobbyScreen({super.key, this.matchId});
 
   @override
   State<ChessLobbyScreen> createState() => _ChessLobbyScreenState();
@@ -14,6 +16,7 @@ class ChessLobbyScreen extends StatefulWidget {
 class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -25,17 +28,35 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
         NavigationDelegate(
           onPageFinished: (String url) {
             if (mounted) setState(() => _isLoading = false);
-            // Inject CSS to hide web header if needed, or adjust padding
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final themeStr = isDark ? 'dark' : 'light';
+            // Inject CSS to hide web header if needed, adjust padding and force theme
             _controller.runJavaScript("""
+              if ('$themeStr' === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme_mode', 'dark');
+              } else {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme_mode', 'light');
+              }
               document.querySelector('header')?.style.setProperty('display', 'none', 'important');
               document.querySelector('nav')?.style.setProperty('display', 'none', 'important');
               document.querySelector('.sidebar')?.style.setProperty('display', 'none', 'important');
-              document.querySelector('.chess-header')?.style.setProperty('margin-top', '20px'); document.getElementById('pwaPromoModal')?.style.setProperty('display', 'none', 'important');
+              document.querySelector('.chess-header')?.style.setProperty('margin-top', '20px');
+              document.getElementById('pwaPromoModal')?.style.setProperty('display', 'none', 'important');
             """);
           },
         ),
       );
-    _initWebView();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _initWebView();
+    }
   }
 
   Future<void> _initWebView() async {
@@ -55,9 +76,13 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
       );
     }
     
-    // The web chess path might be /chess.php or something?
-    // Let's assume it's /chess.php or /chess.php
-    _controller.loadRequest(Uri.parse('${AppConfig.baseUrl}/chess.php?iframe=1&lang=${LocalizationService().currentLanguage}'));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final themeStr = isDark ? 'dark' : 'light';
+    String url = '${AppConfig.baseUrl}/chess.php?iframe=1&lang=${LocalizationService().currentLanguage}&theme=$themeStr';
+    if (widget.matchId != null && widget.matchId!.isNotEmpty) {
+      url += '&match_id=${widget.matchId}';
+    }
+    _controller.loadRequest(Uri.parse(url));
   }
 
   @override
@@ -67,7 +92,7 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
         title: Text(LocalizationService().currentLanguage == 'vi' ? 'Cờ Vua' : 'Chess'),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               setState(() => _isLoading = true);
               _controller.reload();

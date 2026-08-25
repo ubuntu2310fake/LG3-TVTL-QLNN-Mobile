@@ -3,14 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:image_picker/image_picker.dart'; 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'tvtl_service.dart';
 
 class HumanChatRoomScreen extends StatefulWidget {
   final String partnerId;
   final String partnerName;
   final String partnerAvatar;
+  final bool isTeacher;
 
-  const HumanChatRoomScreen({super.key, required this.partnerId, required this.partnerName, required this.partnerAvatar});
+  const HumanChatRoomScreen({
+    super.key,
+    required this.partnerId,
+    required this.partnerName,
+    required this.partnerAvatar,
+    this.isTeacher = false,
+  });
 
   @override
   State<HumanChatRoomScreen> createState() => _HumanChatRoomScreenState();
@@ -25,12 +33,26 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
   bool _isLoading = true;
   Timer? _pollingTimer;
   Map<String, dynamic>? _replyingToMessage; 
+  bool _isAnonymous = false;
+  String _myRole = 'STUDENT';
+
+  bool get _canAnonymous => _myRole == 'STUDENT' && widget.isTeacher;
 
   @override
   void initState() {
     super.initState();
+    _loadUserRole();
     _loadMessages(forceScroll: true);
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _loadMessages(forceScroll: false));
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _myRole = prefs.getString('role') ?? 'STUDENT';
+      });
+    }
   }
 
   @override
@@ -68,15 +90,25 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
     int? replyId = _replyingToMessage?['id']; 
     setState(() { _replyingToMessage = null; });
 
+    final bool sendAsAnon = _canAnonymous && _isAnonymous;
+
     setState(() {
       _messages.add({
-        'sender_id': 'me', 'content': text, 'created_at': DateTime.now().toIso8601String(),
+        'sender_id': 'me',
+        'content': text,
+        'created_at': DateTime.now().toIso8601String(),
+        'is_anonymous': sendAsAnon ? 1 : 0,
         if (text.startsWith('[IMG]:')) 'reactions': null,
       }); 
     });
     _scrollToBottom();
 
-    await TvtlService.sendMessage(text, partnerId: widget.partnerId, replyId: replyId);
+    await TvtlService.sendMessage(
+      text,
+      partnerId: widget.partnerId,
+      replyId: replyId,
+      isAnonymous: sendAsAnon,
+    );
     await _loadMessages(forceScroll: true);
   }
 
@@ -85,7 +117,7 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     if (image == null || !mounted) return;
 
-    showDialog(context: context, barrierDismissible: false, builder: (_) => Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     String? imgUrlPrefix = await TvtlService.uploadChatFile(image.path);
     if (mounted) Navigator.pop(context); 
 
@@ -116,21 +148,21 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
             ),
             const Divider(height: 1),
             if (!isImage)
-              ListTile(leading: Icon(Icons.copy, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chép văn bản' : 'Copy text'), onTap: () {
+              ListTile(leading: const Icon(Icons.copy, color: Colors.blue), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Chép văn bản' : 'Copy text'), onTap: () {
                 Clipboard.setData(ClipboardData(text: rawContent)); 
                 Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đã chép vào bộ nhớ' : 'Copied to clipboard')));
               }),
-            ListTile(leading: Icon(Icons.reply, color: Colors.deepOrange), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Trả lời' : 'Reply'), onTap: () {
+            ListTile(leading: const Icon(Icons.reply, color: Colors.deepOrange), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Trả lời' : 'Reply'), onTap: () {
               Navigator.pop(context);
               setState(() { _replyingToMessage = msg; }); 
               _msgCtrl.clear(); 
               FocusScope.of(context).requestFocus(); 
             }),
             if (isMe)
-              ListTile(leading: Icon(Icons.delete_forever, color: Colors.red), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa ở phía tôi' : 'Delete for me', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), onTap: () {
+              ListTile(leading: const Icon(Icons.delete_forever, color: Colors.red), title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xóa ở phía tôi' : 'Delete for me', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), onTap: () {
                 Navigator.pop(context); _deleteMessage(msg['id']);
               }),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -146,31 +178,113 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isVi = LocalizationService().currentLanguage == 'vi';
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0, title: Row(children: [CircleAvatar(backgroundImage: NetworkImage(widget.partnerAvatar), radius: 18, backgroundColor: Colors.grey.shade200), SizedBox(width: 10), Expanded(child: Text(widget.partnerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis))]),
-        elevation: 1, 
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundImage: NetworkImage(widget.partnerAvatar),
+              radius: 18,
+              backgroundColor: Colors.grey.shade200,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                widget.partnerName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (_canAnonymous)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: FilterChip(
+                showCheckmark: false,
+                avatar: Icon(
+                  _isAnonymous ? Icons.shield_rounded : Icons.shield_outlined,
+                  size: 16,
+                  color: _isAnonymous ? Colors.white : const Color(0xFF8B5CF6),
+                ),
+                label: Text(
+                  isVi ? 'Ẩn danh' : 'Anonymous',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _isAnonymous ? Colors.white : const Color(0xFF8B5CF6),
+                  ),
+                ),
+                selected: _isAnonymous,
+                selectedColor: const Color(0xFF8B5CF6),
+                backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                side: BorderSide(
+                  color: _isAnonymous ? const Color(0xFF8B5CF6) : const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                onSelected: (val) {
+                  setState(() {
+                    _isAnonymous = val;
+                  });
+                },
+              ),
+            ),
+        ],
+        elevation: 1,
       ),
       backgroundColor: isDark ? Theme.of(context).colorScheme.surface : const Color(0xFFF0F2F5),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // BANNER ẨN DANH (NẾU ĐANG BẬT)
+                if (_canAnonymous && _isAnonymous)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+                    color: const Color(0xFF8B5CF6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.shield_rounded, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            isVi
+                                ? 'Đang bật chế độ nhắn tin Ẩn danh với Thầy Cô'
+                                : 'Anonymous mode active with Teachers',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 Expanded(
                   child: ListView.builder(
-                    controller: _scrollCtrl, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final msg = _messages[index];
                       bool isMe = msg['sender_id'].toString() != widget.partnerId;
                       String rawContent = msg['content'].toString();
                       bool isImage = rawContent.startsWith('[IMG]:');
+                      final isAnonMsg = (msg['is_anonymous'] == 1 || msg['is_anonymous'] == '1' || msg['is_anonymous'] == true);
                       
                       bool hasReply = msg['reply_content'] != null && msg['reply_content'].toString().isNotEmpty;
                       String replyRaw = msg['reply_content']?.toString() ?? '';
                       bool replyIsImage = replyRaw.startsWith('[IMG]:');
-                      String replyDisplay = replyIsImage ? LocalizationService().currentLanguage == 'vi' ? 'Mục: Hình ảnh' : 'Attachment: Image' : replyRaw;
+                      String replyDisplay = replyIsImage ? (isVi ? 'Mục: Hình ảnh' : 'Attachment: Image') : replyRaw;
 
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -189,6 +303,27 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  if (isAnonMsg)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4.0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.shield_rounded, size: 13, color: isMe ? Colors.white70 : const Color(0xFF8B5CF6)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            isMe
+                                                ? (isVi ? 'Ẩn danh' : 'Anonymous')
+                                                : (isVi ? 'Học sinh ẩn danh 🛡️' : 'Anonymous Student 🛡️'),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: isMe ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF8B5CF6),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   if (hasReply)
                                     Container(
                                       margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8),
@@ -197,14 +332,14 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Container(width: 2, height: 20, color: isMe ? Colors.white70 : Colors.blue.shade300),
-                                          SizedBox(width: 8),
+                                          const SizedBox(width: 8),
                                           Flexible(child: Text(replyDisplay, style: TextStyle(color: isMe ? Colors.white70 : Colors.blueGrey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                                         ],
                                       ),
                                     ),
                                   
                                   isImage
-                                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network('${TvtlService.pythonBaseUrl}${rawContent.replaceAll('[IMG]:', '')}', fit: BoxFit.cover, loadingBuilder: (_, c, l) => l == null ? c : Container(height: 150, width: 150, color: Colors.grey.shade300, child: Center(child: CircularProgressIndicator())), errorBuilder: (_, e, s) => Icon(Icons.broken_image, color: Colors.grey, size: 50)))
+                                      ? ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network('${TvtlService.pythonBaseUrl}${rawContent.replaceAll('[IMG]:', '')}', fit: BoxFit.cover, loadingBuilder: (_, c, l) => l == null ? c : Container(height: 150, width: 150, color: Colors.grey.shade300, child: const Center(child: CircularProgressIndicator())), errorBuilder: (_, e, s) => const Icon(Icons.broken_image, color: Colors.grey, size: 50)))
                                       : Text(rawContent, style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87), fontSize: 15, height: 1.3)),
                                 ],
                               ),
@@ -229,11 +364,11 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                           decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade100, borderRadius: BorderRadius.circular(12), border: const Border(left: BorderSide(color: Colors.deepOrange, width: 3))),
                           child: Row(
                             children: [
-                              Icon(Icons.reply, color: Colors.deepOrange, size: 16),
-                              SizedBox(width: 10),
+                              const Icon(Icons.reply, color: Colors.deepOrange, size: 16),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  _replyingToMessage!['content'].toString().startsWith('[IMG]:') ? LocalizationService().currentLanguage == 'vi' ? 'Mục: Hình ảnh' : 'Attachment: Image' : _replyingToMessage!['content'].toString(),
+                                  _replyingToMessage!['content'].toString().startsWith('[IMG]:') ? (isVi ? 'Mục: Hình ảnh' : 'Attachment: Image') : _replyingToMessage!['content'].toString(),
                                   style: TextStyle(color: isDark ? Colors.grey[300] : Colors.blueGrey.shade700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -247,16 +382,16 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                       
                       Row(
                         children: [
-                          IconButton(icon: Icon(Icons.image, color: Colors.blue), onPressed: _pickAndSendImage), 
+                          IconButton(icon: const Icon(Icons.image, color: Colors.blue), onPressed: _pickAndSendImage), 
                           
                           Expanded(
                             child: TextField(
                               controller: _msgCtrl, textInputAction: TextInputAction.send, onSubmitted: (_) => _sendMessage(),
-                              decoration: InputDecoration(hintText: LocalizationService().currentLanguage == 'vi' ? 'Nhắn tin...' : 'Type a message...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none), filled: true, fillColor: isDark ? Colors.grey[800] : Colors.grey.shade100, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), isDense: true),
+                              decoration: InputDecoration(hintText: isVi ? 'Nhắn tin...' : 'Type a message...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none), filled: true, fillColor: isDark ? Colors.grey[800] : Colors.grey.shade100, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), isDense: true),
                             ),
                           ),
-                          SizedBox(width: 5),
-                          IconButton(icon: Icon(Icons.send, color: Color(0xFF0084FF)), onPressed: () => _sendMessage()),
+                          const SizedBox(width: 5),
+                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF0084FF)), onPressed: () => _sendMessage()),
                         ],
                       ),
                     ],
