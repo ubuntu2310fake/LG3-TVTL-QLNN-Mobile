@@ -785,6 +785,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void _handleNotificationClick(Map<String, dynamic> data) {
     final url = (data['url'] ?? '').toString();
     final action = (data['action'] ?? '').toString();
+    final type = (data['type'] ?? '').toString();
 
     // 1. Vi phạm của tôi (Chính học sinh bị trừ điểm)
     if (action == 'open_student_violations' || url.contains('student_violations')) {
