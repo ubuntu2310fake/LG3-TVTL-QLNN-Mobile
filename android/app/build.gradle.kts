@@ -12,6 +12,11 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+} else {
+    val localKeyProp = file("key.properties")
+    if (localKeyProp.exists()) {
+        keystoreProperties.load(FileInputStream(localKeyProp))
+    }
 }
 
 android {
@@ -26,47 +31,38 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.lg3.quan_ly_nen_nep"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     signingConfigs {
         create("release") {
-            val keyAliasVal = keystoreProperties.getProperty("keyAlias")
-            val keyPasswordVal = keystoreProperties.getProperty("keyPassword")
-            val storeFileVal = keystoreProperties.getProperty("storeFile")
-            val storePasswordVal = keystoreProperties.getProperty("storePassword")
+            val keyAliasVal = keystoreProperties.getProperty("keyAlias") ?: "lg3key"
+            val keyPasswordVal = keystoreProperties.getProperty("keyPassword") ?: "123456"
+            val storeFileVal = keystoreProperties.getProperty("storeFile") ?: "lg3-release.jks"
+            val storePasswordVal = keystoreProperties.getProperty("storePassword") ?: "123456"
 
-            if (!keyAliasVal.isNullOrEmpty() && !keyPasswordVal.isNullOrEmpty() && !storeFileVal.isNullOrEmpty() && !storePasswordVal.isNullOrEmpty()) {
-                keyAlias = keyAliasVal
-                keyPassword = keyPasswordVal
-                val keyFile = file(storeFileVal)
-                storeFile = if (keyFile.exists()) keyFile else rootProject.file(storeFileVal)
-                storePassword = storePasswordVal
-                enableV1Signing = true
-                enableV2Signing = true
-            }
+            val keyFile = if (file(storeFileVal).exists()) file(storeFileVal)
+                else if (file("lg3-release.jks").exists()) file("lg3-release.jks")
+                else if (rootProject.file(storeFileVal).exists()) rootProject.file(storeFileVal)
+                else if (rootProject.file("app/lg3-release.jks").exists()) rootProject.file("app/lg3-release.jks")
+                else file(storeFileVal)
+
+            keyAlias = keyAliasVal
+            keyPassword = keyPasswordVal
+            storeFile = keyFile
+            storePassword = storePasswordVal
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
     buildTypes {
         release {
-            val releaseConfig = signingConfigs.getByName("release")
-            if (releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()) {
-                signingConfig = releaseConfig
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
