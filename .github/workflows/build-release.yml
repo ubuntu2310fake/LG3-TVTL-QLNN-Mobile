@@ -12,21 +12,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "📥 Tải mã nguồn"
-        uses: actions/checkout@v3
+      - name: "📥 Tải mã nguồn (Shallow clone)"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: "☕ Cài đặt Java 17 (CÓ CACHE GRADLE ĐỂ CHẠY NHANH)"
-        uses: actions/setup-java@v3
+      - name: "☕ Cài đặt Java 17 (Gradle Cache)"
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
           cache: 'gradle' 
 
-      - name: "🦋 Cài đặt Flutter (CÓ CACHE FLUTTER)"
+      - name: "🦋 Cài đặt Flutter (Flutter Cache)"
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true 
+
+      - name: "📦 Cache Pub Dependencies"
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
 
       - name: "📦 Cài thư viện phụ thuộc"
         run: flutter pub get

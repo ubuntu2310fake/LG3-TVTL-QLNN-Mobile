@@ -784,7 +784,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Expanded(child: Text(displayModel, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600, color: isCurrent ? Colors.green : null))),
                             if (dev['push_enabled'] == 1) Icon(Icons.notifications_active, color: Colors.orange, size: 16),
                         ]),
-                        subtitle: Text(LocalizationService().currentLanguage == "vi" ? "Đăng nhập: ${dev['created_at']}" : "Login: ${dev['created_at']}", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        subtitle: Text(
+                          LocalizationService().currentLanguage == "vi" 
+                            ? "Đăng nhập: ${_formatDate(dev['last_active'] ?? dev['created_at'])}" 
+                            : "Login: ${_formatDate(dev['last_active'] ?? dev['created_at'])}", 
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)
+                        ),
                         trailing: !isCurrent ? IconButton(icon: Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () => _kickDevice(dev['session_id'], displayModel)) : null,
                       );
                     },
@@ -797,5 +802,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+  String _formatDate(dynamic dateStr) {
+    if (dateStr == null || dateStr.toString().trim().isEmpty) return LocalizationService().currentLanguage == 'vi' ? 'Gần đây' : 'Recently';
+    try {
+      final dt = DateTime.parse(dateStr.toString());
+      final d = dt.day.toString().padLeft(2, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final h = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$d/$m $h:$min';
+    } catch (_) {
+      return dateStr.toString();
+    }
+  }
+
   bool empty(dynamic val) => val == null || val.toString().trim() == '';
 }

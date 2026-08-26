@@ -644,15 +644,45 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         return;
                       }
                       if (Platform.isAndroid) {
-                        await Permission.requestInstallPackages.request();
+                        final status = await Permission.requestInstallPackages.status;
+                        if (!status.isGranted) {
+                          final req = await Permission.requestInstallPackages.request();
+                          if (!req.isGranted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(LocalizationService().currentLanguage == 'vi'
+                                  ? 'Vui lòng cấp quyền Cài đặt ứng dụng không rõ nguồn gốc để tiếp tục!'
+                                  : 'Please grant Install Unknown Apps permission to update!'),
+                              action: SnackBarAction(
+                                label: LocalizationService().currentLanguage == 'vi' ? 'Cài đặt' : 'Settings',
+                                onPressed: () => openAppSettings(),
+                              ),
+                            ));
+                            return;
+                          }
+                        }
                       }
                       setPopupState(() { isDownloading = true; progress = 0.0; });
                       try {
-                        Directory tempDir = await getTemporaryDirectory(); String savePath = "${tempDir.path}/LG3_v$newVersion.apk";
+                        Directory? downloadDir;
+                        if (Platform.isAndroid) {
+                          final extDirs = await getExternalCacheDirectories();
+                          if (extDirs != null && extDirs.isNotEmpty) {
+                            downloadDir = extDirs.first;
+                          }
+                        }
+                        downloadDir ??= await getTemporaryDirectory();
+                        String savePath = "${downloadDir.path}/LG3_v$newVersion.apk";
+                        final file = File(savePath);
+                        if (await file.exists()) {
+                          try { await file.delete(); } catch (_) {}
+                        }
                         await Dio().download(downloadUrl, savePath, onReceiveProgress: (rcv, total) { if (total != -1) setPopupState(() { progress = rcv / total; }); });
                         if (!isForceUpdate && context.mounted) Navigator.pop(context); 
                         if (Platform.isAndroid) {
-                          await OpenFilex.open(savePath);
+                          final result = await OpenFilex.open(savePath, type: 'application/vnd.android.package-archive');
+                          if (result.type != ResultType.done && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Không thể tự mở file APK (${result.message})' : 'Could not open APK (${result.message})')));
+                          }
                         }
                         if (isForceUpdate) setPopupState(() { isDownloading = false; progress = 1.0; });
                       } catch (e) {
@@ -1111,8 +1141,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       const Divider(),
                       Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text(T('discipline_academic', def: LocalizationService().currentLanguage == 'vi' ? 'CÔNG TÁC NỀN NẾP & HỌC TẬP' : 'DISCIPLINE & ACADEMIC WORK'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
                       
-                      ListTile(leading: Icon(Icons.gavel, color: Colors.red), title: Text(T('manage_violations', def: LocalizationService().currentLanguage == 'vi' ? 'Quản lý Vi phạm' : 'Manage Violations'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageViolationsScreen())); }),
-                      ListTile(leading: Icon(Icons.task, color: Colors.pink), title: Text(T('manage_exams', def: LocalizationService().currentLanguage == 'vi' ? 'Quản lý Kỳ thi' : 'Manage Exams'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageExamsScreen())); }),
                       ListTile(leading: Icon(Icons.history, color: Colors.purple), title: Text(T('violation_history', def: LocalizationService().currentLanguage == 'vi' ? 'Lịch sử vi phạm' : 'Violation History'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ViolationHistoryScreen())); }),
                       ListTile(leading: Icon(Icons.edit_note, color: Colors.teal), title: Text(T('academic_scores', def: LocalizationService().currentLanguage == 'vi' ? 'Nhập điểm học tập' : 'Academic Scores'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => InputAcademicScreen())); }),
                       ListTile(leading: Icon(Icons.file_download, color: Colors.green), title: Text(T('export_report', def: LocalizationService().currentLanguage == 'vi' ? 'Xuất báo cáo Excel' : 'Export Excel'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ExportReportScreen())); }),
@@ -1121,8 +1149,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
                     if (_isAdmin) ...[
                       const Divider(),
-                      Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text(T('system_admin', def: LocalizationService().currentLanguage == 'vi' ? 'HỆ THỐNG' : 'SYSTEM'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+                      Padding(padding: EdgeInsets.only(left: 16, top: 8, bottom: 8), child: Text(T('system_admin', def: LocalizationService().currentLanguage == 'vi' ? 'HỆ THỐNG ADMIN' : 'ADMIN SYSTEM'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
                       
+                      ListTile(leading: Icon(Icons.gavel, color: Colors.red), title: Text(T('manage_violations', def: LocalizationService().currentLanguage == 'vi' ? 'Quản lý Vi phạm' : 'Manage Violations'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageViolationsScreen())); }),
+                      ListTile(leading: Icon(Icons.task, color: Colors.pink), title: Text(T('manage_exams', def: LocalizationService().currentLanguage == 'vi' ? 'Quản lý Kỳ thi' : 'Manage Exams'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageExamsScreen())); }),
                       ListTile(leading: Icon(Icons.people_alt, color: Colors.indigo), title: Text(T('manage_students', def: LocalizationService().currentLanguage == 'vi' ? 'Học sinh toàn trường' : 'All Students'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageStudentsScreen())); }),
                       ListTile(leading: Icon(Icons.admin_panel_settings, color: Colors.redAccent), title: Text(T('manage_users', def: LocalizationService().currentLanguage == 'vi' ? 'Tài khoản & Phân quyền' : 'Accounts & Permissions'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => ManageUsersScreen())); }),
                       ListTile(leading: Icon(Icons.security, color: Colors.brown), title: Text(T('banned_ips', def: LocalizationService().currentLanguage == 'vi' ? 'Lịch sử khóa IP' : 'Banned IPs History'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), onTap: () { Navigator.pop(context); Navigator.push(context, MaterialPageRoute(builder: (_) => BannedIpsScreen())); }),

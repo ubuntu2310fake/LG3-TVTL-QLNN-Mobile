@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,7 +24,7 @@ import 'config.dart';
 import 'localization_service.dart';
 import 'device_helper.dart';
 
-const String currentAppVersion = "2.0.4";
+const String currentAppVersion = "2.0.5";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 bool _isProcessingNoti = false;
@@ -216,23 +217,33 @@ class LG3App extends StatelessWidget {
         return ValueListenableBuilder<String>(
           valueListenable: LocalizationService().languageNotifier,
           builder: (context, lang, child) {
-            return MaterialApp(key: ValueKey(lang), navigatorKey: navigatorKey,
-          title: LocalizationService().currentLanguage == 'vi' ? 'LG3 Quản Lý Nền Nếp' : 'LG3 Quan Ly Nen Nep',
-          debugShowCheckedModeBanner: false,
-          themeMode: currentMode,
-          theme: ThemeData(
-             
-            textTheme: GoogleFonts.beVietnamProTextTheme(ThemeData.light().textTheme),
-            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF005FBA), brightness: Brightness.light),
-            useMaterial3: true,
-          ),
-          darkTheme: ThemeData(
-            
-            textTheme: GoogleFonts.beVietnamProTextTheme(ThemeData.dark().textTheme),
-            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF005FBA), brightness: Brightness.dark),
-            useMaterial3: true,
-          ),
-          home: const SplashScreen(),
+            return MaterialApp(
+              key: ValueKey(lang),
+              navigatorKey: navigatorKey,
+              title: LocalizationService().currentLanguage == 'vi' ? 'LG3 Quản Lý Nền Nếp' : 'LG3 Quan Ly Nen Nep',
+              debugShowCheckedModeBanner: false,
+              locale: Locale(lang),
+              supportedLocales: const [
+                Locale('vi', 'VN'),
+                Locale('en', 'US'),
+              ],
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              themeMode: currentMode,
+              theme: ThemeData(
+                textTheme: GoogleFonts.beVietnamProTextTheme(ThemeData.light().textTheme),
+                colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF005FBA), brightness: Brightness.light),
+                useMaterial3: true,
+              ),
+              darkTheme: ThemeData(
+                textTheme: GoogleFonts.beVietnamProTextTheme(ThemeData.dark().textTheme),
+                colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF005FBA), brightness: Brightness.dark),
+                useMaterial3: true,
+              ),
+              home: const SplashScreen(),
             );
           },
         );
