@@ -863,7 +863,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       try {
                         Directory? downloadDir;
                         if (Platform.isAndroid) {
-                          final extDirs = await getExternalCacheDirectories();
+                          final extDirs = <Directory>[await getApplicationDocumentsDirectory()];
                           if (extDirs != null && extDirs.isNotEmpty) {
                             downloadDir = extDirs.first;
                           }

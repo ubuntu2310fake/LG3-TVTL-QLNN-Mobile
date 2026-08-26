@@ -24,7 +24,7 @@ import 'config.dart';
 import 'localization_service.dart';
 import 'device_helper.dart';
 
-const String currentAppVersion = "2.0.6_hf1";
+const String currentAppVersion = "2.0.6_hf2";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 bool _isProcessingNoti = false;

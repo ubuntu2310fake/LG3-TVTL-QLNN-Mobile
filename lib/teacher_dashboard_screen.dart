@@ -45,8 +45,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           _data = data; 
           _isLoading = false; 
         });
+      } else {
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
