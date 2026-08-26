@@ -53,6 +53,8 @@ android {
                 val keyFile = file(storeFileVal)
                 storeFile = if (keyFile.exists()) keyFile else rootProject.file(storeFileVal)
                 storePassword = storePasswordVal
+                enableV1Signing = true
+                enableV2Signing = true
             }
         }
     }
