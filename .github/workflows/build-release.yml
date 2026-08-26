@@ -3,12 +3,32 @@ name: Build & Release LG3 App
 on:
   push:
     tags:
-      - '*' 
+      - '*'
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Loại Release (full_apk hoặc hotfix_patch)'
+        required: true
+        default: 'hotfix_patch'
+        type: choice
+        options:
+          - hotfix_patch
+          - full_apk
+      version_tag:
+        description: 'Phiên bản (Ví dụ: 2.0.5_hf1)'
+        required: false
+        default: '2.0.5_hf1'
+      patch_note:
+        description: 'Ghi chú cho bản vá (Changelog / Patch note)'
+        required: false
+        default: 'Hotfix 2.0.5_hf1: Tự động gợi ý mở liên kết mặc định trong App'
 
 jobs:
-  build:
-    name: Build APK and Create Release
+  # ==============================================================
+  # JOB 1: BUILD APKs & TỰ ĐỘNG ĐÓNG GÓI PATCH
+  # ==============================================================
+  build_release:
+    name: Build & Release (${{ inputs.version_tag || github.ref_name }})
     runs-on: ubuntu-latest
 
     steps:
@@ -22,13 +42,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-          cache: 'gradle' 
+          cache: 'gradle'
 
       - name: "🦋 Cài đặt Flutter (Flutter Cache)"
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true 
+          cache: true
 
       - name: "📦 Cache Pub Dependencies"
         uses: actions/cache@v4
@@ -43,7 +63,6 @@ jobs:
       - name: "📦 Cài thư viện phụ thuộc"
         run: flutter pub get
 
-      # --- BƯỚC NÀY LẦN TRƯỚC SẾP QUÊN CHƯA CHO VÀO NÀY ---
       - name: "🔐 Giải mã Chữ ký số LG3"
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -51,29 +70,44 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          # ĐÃ SỬA: Thêm ngoặc kép và cờ --ignore-garbage (-i)
           echo "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > android/app/lg3-release.jks
           echo "storePassword=$STORE_PASSWORD" > android/key.properties
           echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
           echo "storeFile=lg3-release.jks" >> android/key.properties
-      # ----------------------------------------------------
 
       - name: "🚀 Build APK (Split per ABI)"
         run: flutter build apk --split-per-abi
 
-      - name: "🏷️ Đổi tên file cho chuẩn API"
+      - name: "🏷️ Đổi tên file chuẩn API & Tạo Patch"
         run: |
+          mkdir -p release_artifacts
           cd build/app/outputs/flutter-apk/
           mv app-arm64-v8a-release.apk LG3_TVTL_QLNN_Android_arm64-v8a.apk
           mv app-armeabi-v7a-release.apk LG3_TVTL_QLNN_Android_armeabi-v7a.apk
+          cp LG3_TVTL_QLNN_Android_arm64-v8a.apk ../../../../release_artifacts/
+          cp LG3_TVTL_QLNN_Android_armeabi-v7a.apk ../../../../release_artifacts/
+          cd ../../../../
 
-      - name: "📤 Đẩy file lên Release GitHub"
+          TAG_NAME="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ inputs.version_tag }}"
+          fi
+
+          if [[ "$TAG_NAME" == *"_hf"* ]] || [ "${{ inputs.release_type }}" = "hotfix_patch" ]; then
+            echo "🔥 Tạo file Patch siêu tốc cho $TAG_NAME..."
+            zip -j release_artifacts/patch_${TAG_NAME}.patch build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android_arm64-v8a.apk
+          fi
+          sha256sum release_artifacts/* > release_artifacts/checksums.txt
+
+      - name: "📤 Đẩy Patch & APKs lên GitHub Release cùng lúc"
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
+          body: ${{ github.event_name == 'workflow_dispatch' && inputs.patch_note || '' }}
           files: |
-            build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android_arm64-v8a.apk
-            build/app/outputs/flutter-apk/LG3_TVTL_QLNN_Android_armeabi-v7a.apk
+            release_artifacts/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

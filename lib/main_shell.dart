@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'offline_sync.dart';
 import 'dart:convert';
-
-import 'dart:io';
 import 'dart:ui'; 
 import 'dart:async'; 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'localization_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -608,8 +607,116 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       if (response.statusCode == 200 && response.data['update_available'] == true) {
         final data = response.data;
         if (mounted) _showUpdateDialog(data['version'].toString(), data['note'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Bản cập nhật tối ưu hóa' : 'Optimization update'), data['download_url'].toString(), data['is_force_update'] == true);
+      } else {
+        // Nếu không có bản cập nhật mới, kiểm tra nhắc người dùng bật Mở liên kết mặc định
+        _checkDefaultLinkPrompt();
       }
-    } catch (e) {}
+    } catch (e) {
+      _checkDefaultLinkPrompt();
+    }
+  }
+
+  Future<void> _checkDefaultLinkPrompt() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      bool hasAsked = prefs.getBool('has_prompted_default_links') ?? false;
+      if (!hasAsked && mounted) {
+        // Đợi UI render xong thì hiện dialog gợi ý bật liên kết mặc định
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) _showDefaultLinkDialog();
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _showDefaultLinkDialog() {
+    bool isVi = LocalizationService().currentLanguage == 'vi';
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF005FBA).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.link_rounded, color: Color(0xFF005FBA), size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isVi ? 'Mở trực tiếp trên App' : 'Open Links in App',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isVi 
+                ? 'Để trải nghiệm tốt nhất (tự động mở App khi bấm vào link học sinh, thông báo, mã QR thay vì mở trình duyệt Web), vui lòng bật quyền "Mở các liên kết được hỗ trợ".'
+                : 'For the best experience, allow LG3 App to automatically open supported links (*.testifiyonline.xyz) directly instead of browser.',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 18, color: Color(0xFF005FBA)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isVi ? 'Bấm "Cài đặt" -> Bật "Mở các liên kết được hỗ trợ"' : 'Tap "Settings" -> Enable "Open supported links"',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF005FBA)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('has_prompted_default_links', true);
+              if (mounted) Navigator.pop(ctx);
+            },
+            child: Text(isVi ? 'Để sau' : 'Later', style: const TextStyle(color: Colors.grey)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF005FBA),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('has_prompted_default_links', true);
+              if (mounted) Navigator.pop(ctx);
+              try {
+                const platform = MethodChannel('com.lg3.app/default_settings');
+                await platform.invokeMethod('openAppOpenByDefaultSettings');
+              } catch (_) {}
+            },
+            child: Text(isVi ? 'Cài đặt ngay' : 'Open Settings', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showUpdateDialog(String newVersion, String changelog, String downloadUrl, bool isForceUpdate) {
