@@ -16,13 +16,13 @@ on:
           - fast_patch
           - full_apks
       version_tag:
-        description: 'Phiên bản (Ví dụ: 2.0.5_hf1)'
+        description: 'Phiên bản (Ví dụ: 2.0.6)'
         required: false
-        default: '2.0.5_hf1'
+        default: '2.0.6'
       patch_note:
-        description: 'Ghi chú cho bản vá (Changelog / Patch note)'
+        description: 'Ghi chú cho bản phát hành (Changelog)'
         required: false
-        default: 'Hotfix 2.0.5_hf1: Tự động gợi ý mở liên kết mặc định trong App'
+        default: 'Phát hành chính thức phiên bản 2.0.6'
 
 jobs:
   # ==============================================================
@@ -78,20 +78,29 @@ jobs:
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
           echo "storeFile=lg3-release.jks" >> android/key.properties
 
-      - name: "⚡ Cắt Patch riêng biệt (Chỉ compile Dart AOT & Assets)"
+      - name: "⚡ Cắt Patch siêu gọn (Chỉ trích xuất libapp.so & flutter_assets)"
         run: |
-          mkdir -p patch_artifacts
+          mkdir -p patch_artifacts patch_temp
           TAG_NAME="${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG_NAME="${{ inputs.version_tag }}"
           fi
 
-          # Build APK arm64 siêu tốc làm nguồn trích xuất
+          # 1. Biên dịch Dart AOT arm64
           flutter build apk --target-platform android-arm64
           
-          # Đóng gói Patch và file APK arm64
+          # 2. Đổi tên lưu bản APK arm64
           cp build/app/outputs/flutter-apk/app-release.apk patch_artifacts/LG3_TVTL_QLNN_Android_arm64-v8a.apk
-          zip -j patch_artifacts/patch_${TAG_NAME}.patch patch_artifacts/LG3_TVTL_QLNN_Android_arm64-v8a.apk
+          
+          # 3. TRÍCH XUẤT CHÍNH XÁC PHẦN CODE VÀ ASSETS (Không lấy Engine/Native cồng kềnh)
+          unzip -q build/app/outputs/flutter-apk/app-release.apk "lib/arm64-v8a/libapp.so" "assets/flutter_assets/*" -d patch_temp/
+          
+          # 4. Đóng gói thành file Patch siêu nhẹ (~3MB - 5MB)
+          cd patch_temp
+          zip -r -9 ../patch_artifacts/patch_${TAG_NAME}.patch .
+          cd ..
+          rm -rf patch_temp
+
           sha256sum patch_artifacts/* > patch_artifacts/checksums.txt
 
       - name: "📤 Đẩy file Patch lên GitHub Release ngay tức thì"

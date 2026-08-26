@@ -8,7 +8,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'config.dart';
 
 class VideoRenderService {
@@ -26,33 +25,7 @@ class VideoRenderService {
       String inputPath = result.files.single.path!;
       
       webViewController.runJavaScript("window.onFlutterRenderStart();");
-      _updateProgressToWeb(0, LocalizationService().currentLanguage == 'vi' ? "Đang soi cấu trúc Video..." : "Dang soi cau truc Video...");
-
-      final mediaInfoSession = await FFprobeKit.getMediaInformation(inputPath);
-      final mediaInfo = mediaInfoSession.getMediaInformation();
-      
-      double totalDurationSec = 1.0;
-      int videoWidth = 0;
-      int videoHeight = 0;
-
-      if (mediaInfo != null) {
-        if (mediaInfo.getDuration() != null) totalDurationSec = double.parse(mediaInfo.getDuration()!);
-        for (var stream in mediaInfo.getStreams()!) {
-          if (stream.getType() == "video") {
-            videoWidth = stream.getWidth() ?? 0;
-            videoHeight = stream.getHeight() ?? 0;
-            break;
-          }
-        }
-      }
-
-      if (videoWidth > 0 && videoHeight > 0) {
-        int shortestSide = videoWidth < videoHeight ? videoWidth : videoHeight;
-        if (shortestSide < 720) {
-          _sendErrorToWeb(LocalizationService().currentLanguage == 'vi' ? "Video quá mờ (${videoWidth}x$videoHeight). Vui lòng chọn video rõ nét hơn (Tối thiểu 720p)." : "Video qua mo (${videoWidth}x$videoHeight). Vui long chon video ro net hon (Toi thieu 720p).");
-          return; 
-        }
-      }
+      _updateProgressToWeb(0, LocalizationService().currentLanguage == 'vi' ? "Đang chuẩn bị gửi Video..." : "Preparing video...");
 
       final tempDir = await getTemporaryDirectory();
       final taskId = "vid_lg3_${DateTime.now().millisecondsSinceEpoch}";

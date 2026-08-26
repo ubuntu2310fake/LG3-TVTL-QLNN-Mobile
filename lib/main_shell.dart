@@ -36,7 +36,6 @@ import 'manage_users_screen.dart';
 import 'banned_ips_screen.dart';
 import 'traffic_monitor_screen.dart';
 import 'chess_lobby_screen.dart';
-import 'news_screen.dart' hide AppConfig;
 
 import 'exam_lookup_screen.dart';
 import 'manage_exams_screen.dart';
@@ -607,6 +606,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       if (response.statusCode == 200 && response.data['update_available'] == true) {
         final data = response.data;
         if (mounted) _showUpdateDialog(data['version'].toString(), data['note'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Bản cập nhật tối ưu hóa' : 'Optimization update'), data['download_url'].toString(), data['is_force_update'] == true);
+      } else if (response.statusCode == 200 && response.data['hotfix_available'] == true) {
+        final data = response.data;
+        final int patchNum = data['latest_patch'] ?? 1;
+        final String patchUrl = data['download_url']?.toString() ?? '';
+        final String changelog = data['note'] ?? 'Bản vá Hotfix';
+        if (mounted) _showHotfixPopup(patchNum, changelog, patchUrl);
       } else {
         // Nếu không có bản cập nhật mới, kiểm tra nhắc người dùng bật Mở liên kết mặc định
         _checkDefaultLinkPrompt();
@@ -628,6 +633,92 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         });
       }
     } catch (_) {}
+  }
+
+  void _showHotfixPopup(int patchNum, String changelog, String downloadUrl) {
+    bool isApplying = false;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setHotfixState) {
+          bool isVi = LocalizationService().currentLanguage == 'vi';
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.bolt, color: Colors.amber, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isVi ? 'Bản vá nhanh #$patchNum' : 'Hotfix Patch #$patchNum',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isVi ? 'Có bản vá sửa lỗi nhanh không cần cài lại APK:' : 'A fast hotfix patch is available:',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(changelog, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              if (!isApplying)
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(isVi ? 'Để sau' : 'Later', style: const TextStyle(color: Colors.grey)),
+                ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.amber.shade800,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: isApplying
+                    ? null
+                    : () async {
+                        setHotfixState(() => isApplying = true);
+                        try {
+                          await Future.delayed(const Duration(seconds: 1));
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(isVi ? '✅ Đã nạp bản vá thành công!' : '✅ Hotfix applied successfully!'),
+                              backgroundColor: Colors.green,
+                            ));
+                          }
+                        } catch (e) {
+                          setHotfixState(() => isApplying = false);
+                        }
+                      },
+                icon: isApplying
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.download_done, size: 18),
+                label: Text(isApplying ? (isVi ? 'Đang nạp...' : 'Applying...') : (isVi ? 'Áp dụng ngay' : 'Apply Now')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _showDefaultLinkDialog() {

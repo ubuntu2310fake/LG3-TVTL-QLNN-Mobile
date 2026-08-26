@@ -23,7 +23,6 @@ import 'manage_users_screen.dart';
 import 'banned_ips_screen.dart';
 import 'traffic_monitor_screen.dart'; 
 import 'consulting_test_screen.dart';
-import 'news_screen.dart' hide AppConfig;
 import 'exam_lookup_screen.dart';
 import 'manage_exams_screen.dart';
 import 'grammar_check_screen.dart';
