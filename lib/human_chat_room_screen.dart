@@ -36,7 +36,7 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
   bool _isAnonymous = false;
   String _myRole = 'STUDENT';
 
-  bool get _canAnonymous => _myRole == 'STUDENT' && widget.isTeacher;
+  bool get _canAnonymous => ['STUDENT', 'RED_FLAG'].contains(_myRole) && widget.isTeacher;
 
   @override
   void initState() {

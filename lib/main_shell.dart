@@ -621,13 +621,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
+  static bool _hasPromptedThisSession = false;
+
   Future<void> _checkDefaultLinkPrompt() async {
     if (!Platform.isAndroid) return;
+    if (_hasPromptedThisSession) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      bool hasAsked = prefs.getBool('has_prompted_default_links') ?? false;
+      bool hasAsked = prefs.getBool('has_prompted_default_links_v2') ?? false;
       if (!hasAsked && mounted) {
-        // Đợi UI render xong thì hiện dialog gợi ý bật liên kết mặc định
+        _hasPromptedThisSession = true;
+        await prefs.setBool('has_prompted_default_links_v2', true); // Ghi ngay vào đĩa để không bao giờ hỏi lại lần 2
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) _showDefaultLinkDialog();
         });
@@ -782,9 +786,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('has_prompted_default_links', true);
+            onPressed: () {
               if (mounted) Navigator.pop(ctx);
             },
             child: Text(isVi ? 'Để sau' : 'Later', style: const TextStyle(color: Colors.grey)),
@@ -795,8 +797,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('has_prompted_default_links', true);
               if (mounted) Navigator.pop(ctx);
               try {
                 const platform = MethodChannel('com.lg3.app/default_settings');

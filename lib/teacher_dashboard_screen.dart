@@ -17,6 +17,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   bool _isLoading = true;
   String _week = '';
   Map<String, dynamic> _data = {};
+  String _role = 'STUDENT';
 
   @override
   void initState() {
@@ -29,8 +30,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
+      _role = prefs.getString('role') ?? 'STUDENT';
       
-      String url = '${AppConfig.baseUrl}/api/teacher_dashboard_api';
+      String url = '${AppConfig.baseUrl}/api/teacher_dashboard_api.php';
       if (_week.isNotEmpty) url += '?week=$_week';
 
       final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
@@ -45,10 +47,27 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Future<void> _resetPassword(dynamic student) async {
+    if (!await _confirm(LocalizationService().currentLanguage == 'vi' ? 'Bạn có chắc muốn đặt lại mật khẩu của ${student['name']} về mặc định?' : 'Reset password to default for ${student['name']}?')) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionId = prefs.getString('phpsessid') ?? '';
+      final res = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/api/teacher_dashboard_api.php'),
+        headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
+        body: jsonEncode({'action': 'reset_student_password', 'student_id': student['id']}),
+      );
+      final data = jsonDecode(res.body);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['msg'] ?? 'Success')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
   Future<void> _deleteViolation(int id) async {
     if (!await _confirm(LocalizationService().currentLanguage == 'vi' ? 'Bạn có chắc muốn xóa lỗi vi phạm này?' : 'Are you sure you want to delete this violation?')) return;
     try {
@@ -133,8 +152,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final showPsychology = _role != 'RED_FLAG';
+
     return DefaultTabController(
-      length: 4,
+      length: showPsychology ? 4 : 3,
       child: Scaffold(
         appBar: AppBar(
           title: Column(
@@ -153,7 +174,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               Tab(icon: Icon(Icons.people), text: LocalizationService().currentLanguage == 'vi' ? 'Học sinh' : 'Students'),
               Tab(icon: Icon(Icons.warning_amber), text: LocalizationService().currentLanguage == 'vi' ? 'Vi phạm' : 'Violations'),
               Tab(icon: Icon(Icons.grid_on), text: LocalizationService().currentLanguage == 'vi' ? 'Điểm Sổ' : 'Record'),
-              Tab(icon: Icon(Icons.psychology), text: LocalizationService().currentLanguage == 'vi' ? 'Tâm lý' : 'Psychology'),
+              if (showPsychology) Tab(icon: Icon(Icons.psychology), text: LocalizationService().currentLanguage == 'vi' ? 'Tâm lý' : 'Psychology'),
             ],
           ),
           actions: [
@@ -188,7 +209,24 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   leading: CircleAvatar(child: Text(s['name'][0])), 
                   title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)), 
                   subtitle: Text(s['code']), 
-                  trailing: s['has_exemption'] == 1 ? Icon(Icons.shield, color: Colors.green) : null
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (s['has_exemption'] == 1) const Icon(Icons.shield, color: Colors.green),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(Icons.key, size: 16),
+                        label: Text(LocalizationService().currentLanguage == 'vi' ? 'Reset MK' : 'Reset Pwd', style: const TextStyle(fontSize: 12)),
+                        onPressed: () => _resetPassword(s),
+                      ),
+                    ],
+                  )
                 ));
               },
             ),
@@ -247,7 +285,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 ],
               ),
             ),
-            _data['psychology'].isEmpty ? Center(child: Text(LocalizationService().currentLanguage == 'vi' ? "Tâm lý ổn định." : "Tam ly on dinh.")) : ListView.builder(
+            if (showPsychology)
+              _data['psychology'].isEmpty ? Center(child: Text(LocalizationService().currentLanguage == 'vi' ? "Tâm lý ổn định." : "Tam ly on dinh.")) : ListView.builder(
               padding: const EdgeInsets.all(12), itemCount: _data['psychology'].length,
               itemBuilder: (c, i) {
                 var p = _data['psychology'][i]; bool isDanger = p['risk_level'] == 'DANGER';

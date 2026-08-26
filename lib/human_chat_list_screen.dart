@@ -115,7 +115,7 @@ class _HumanChatListScreenState extends State<HumanChatListScreen> {
               partnerId: idStr,
               partnerName: c['full_name'] ?? c['partner_name'],
               partnerAvatar: _fixAvatarUrl(c['avatar'] ?? ''),
-              isTeacher: (_role == 'STUDENT'),
+              isTeacher: (['STUDENT', 'RED_FLAG'].contains(_role)),
             ))).then((_) => _initData());
           }
         );
