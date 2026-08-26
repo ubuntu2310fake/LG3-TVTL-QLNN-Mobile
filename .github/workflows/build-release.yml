@@ -7,13 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Loại Release (full_apk hoặc hotfix_patch)'
+        description: 'Loại Release (patch_only, fast_patch, hoặc full_apks)'
         required: true
-        default: 'hotfix_patch'
+        default: 'patch_only'
         type: choice
         options:
-          - hotfix_patch
-          - full_apk
+          - patch_only
+          - fast_patch
+          - full_apks
       version_tag:
         description: 'Phiên bản (Ví dụ: 2.0.5_hf1)'
         required: false
@@ -25,10 +26,11 @@ on:
 
 jobs:
   # ==============================================================
-  # JOB 1: BUILD HOTFIX PATCH SIÊU TỐC (CHỈ BUILD ARM64 VÀ ĐẨY TRƯỚC)
+  # JOB 1: TẠO FILE PATCH RIÊNG BIỆT (KHÔNG CẦN BUILD FULL APK)
   # ==============================================================
   build_patch:
-    name: ⚡ Fast Hotfix Patch (${{ inputs.version_tag || github.ref_name }})
+    name: ⚡ Fast Patch Only (${{ inputs.version_tag || github.ref_name }})
+    if: github.event_name == 'push' || inputs.release_type == 'patch_only' || inputs.release_type == 'fast_patch'
     runs-on: ubuntu-latest
 
     steps:
@@ -76,26 +78,23 @@ jobs:
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
           echo "storeFile=lg3-release.jks" >> android/key.properties
 
-      - name: "⚡ Build APK arm64 siêu tốc"
-        run: flutter build apk --target-platform android-arm64
-
-      - name: "🏷️ Tạo file Patch"
+      - name: "⚡ Cắt Patch riêng biệt (Chỉ compile Dart AOT & Assets)"
         run: |
           mkdir -p patch_artifacts
-          cd build/app/outputs/flutter-apk/
-          mv app-release.apk LG3_TVTL_QLNN_Android_arm64-v8a.apk
-          cp LG3_TVTL_QLNN_Android_arm64-v8a.apk ../../../../patch_artifacts/
-          cd ../../../../
-
           TAG_NAME="${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG_NAME="${{ inputs.version_tag }}"
           fi
 
-          echo "🔥 Đóng gói file Patch cho $TAG_NAME..."
+          # Build APK arm64 siêu tốc làm nguồn trích xuất
+          flutter build apk --target-platform android-arm64
+          
+          # Đóng gói Patch và file APK arm64
+          cp build/app/outputs/flutter-apk/app-release.apk patch_artifacts/LG3_TVTL_QLNN_Android_arm64-v8a.apk
           zip -j patch_artifacts/patch_${TAG_NAME}.patch patch_artifacts/LG3_TVTL_QLNN_Android_arm64-v8a.apk
+          sha256sum patch_artifacts/* > patch_artifacts/checksums.txt
 
-      - name: "📤 Đẩy Hotfix Patch lên GitHub Release ngay"
+      - name: "📤 Đẩy file Patch lên GitHub Release ngay tức thì"
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
@@ -112,6 +111,7 @@ jobs:
   # ==============================================================
   build_full_apks:
     name: 📦 Full Split APKs (${{ inputs.version_tag || github.ref_name }})
+    if: github.event_name == 'push' || inputs.release_type == 'fast_patch' || inputs.release_type == 'full_apks'
     runs-on: ubuntu-latest
 
     steps:
