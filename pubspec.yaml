@@ -1,7 +1,7 @@
 name: lg3_tvtl_qlnn
 description: "Phần mềm tư vấn tâm lý và quản lý thi đua - trường THPT Lạng Giang 3"
 publish_to: 'none'
-version: 2.0.6+16
+version: 2.0.6+17
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

@@ -16,13 +16,13 @@ on:
           - fast_patch
           - full_apks
       version_tag:
-        description: 'Phiên bản (Ví dụ: 2.0.6_hf3)'
+        description: 'Phiên bản (Ví dụ: 2.0.6_hf4)'
         required: false
-        default: '2.0.6_hf3'
+        default: '2.0.6_hf4'
       patch_note:
         description: 'Ghi chú cho bản phát hành (Changelog)'
         required: false
-        default: 'Hotfix 2.0.6_hf3: Tích hợp biểu đồ Radar cho màn hình đánh giá tâm lý'
+        default: 'Hotfix 2.0.6_hf4: Cập nhật màn hình hồ sơ cá nhân'
 
 jobs:
   # ==============================================================

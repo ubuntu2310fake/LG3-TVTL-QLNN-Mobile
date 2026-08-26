@@ -619,17 +619,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Column(
                 children: [
-                  ListTile(
-                    leading: Icon(Icons.open_in_new, color: Colors.blue),
-                    title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xem trang Bio của tôi' : 'View My Bio Page'),
-                    trailing: Icon(Icons.chevron_right),
-                    onTap: () async {
-                      final code = _userData?['username'] ?? '';
-                      final Uri url = Uri.parse('${AppConfig.baseUrl}/$code');
-                      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {}
-                    },
-                  ),
-                  Divider(height: 1),
+                  if (_userData != null && ['STUDENT', 'RED_FLAG'].contains(_userData!['role'])) ...[
+                    ListTile(
+                      leading: Icon(Icons.open_in_new, color: Colors.blue),
+                      title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xem trang Bio của tôi' : 'View My Bio Page'),
+                      trailing: Icon(Icons.chevron_right),
+                      onTap: () async {
+                        final code = _userData?['username'] ?? '';
+                        final Uri url = Uri.parse('${AppConfig.baseUrl}/$code');
+                        if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {}
+                      },
+                    ),
+                    Divider(height: 1),
+                  ],
                   Builder(
                     builder: (context) {
                       bool isEmailLinked = _userData != null && _userData!['email'] != null && _userData!['email'].toString().isNotEmpty && (_userData!['email_verified'] == 1 || _userData!['email_verified'] == '1' || _userData!['email_verified'] == true);
@@ -712,53 +714,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            SizedBox(height: 20),
-            // MẠNG XÃ HỘI (TRỰC TIẾP TRÊN MÀN HÌNH NHƯ BẢN WEB)
-            Align(alignment: Alignment.centerLeft, child: Text(LocalizationService().currentLanguage == 'vi' ? 'Mạng xã hội' : 'Social Media', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-            SizedBox(height: 8),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    TextField(controller: _fbCtrl, decoration: InputDecoration(labelText: 'Facebook URL', prefixIcon: Icon(Icons.facebook, color: Colors.blue))),
-                    SizedBox(height: 10),
-                    TextField(controller: _zlCtrl, decoration: InputDecoration(labelText: 'Zalo URL', prefixIcon: Icon(Icons.chat, color: Colors.blueAccent))),
-                    SizedBox(height: 10),
-                    TextField(controller: _ttCtrl, decoration: InputDecoration(labelText: 'TikTok URL', prefixIcon: Icon(Icons.music_note, color: Colors.black))),
-                    SizedBox(height: 10),
-                    TextField(controller: _igCtrl, decoration: InputDecoration(labelText: 'Instagram URL', prefixIcon: Icon(Icons.camera_alt, color: Colors.pink))),
-                    SizedBox(height: 10),
-                    TextField(controller: _ytCtrl, decoration: InputDecoration(labelText: 'YouTube URL', prefixIcon: Icon(Icons.play_circle, color: Colors.red))),
-                    SizedBox(height: 10),
-                    TextField(controller: _ghCtrl, decoration: InputDecoration(labelText: 'GitHub URL', prefixIcon: Icon(Icons.code, color: Colors.black87))),
-                    SizedBox(height: 10),
-                    TextField(controller: _thCtrl, decoration: InputDecoration(labelText: 'Threads URL', prefixIcon: Icon(Icons.alternate_email, color: Colors.black))),
-                    SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        icon: Icon(Icons.save),
-                        label: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu MXH' : 'Save Social Media'),
-                        onPressed: () {
-                          _apiPost({
-                            'facebook_url': _fbCtrl.text,
-                            'zalo_url': _zlCtrl.text,
-                            'tiktok_url': _ttCtrl.text,
-                            'instagram_url': _igCtrl.text,
-                            'youtube_url': _ytCtrl.text,
-                            'github_url': _ghCtrl.text,
-                            'threads_url': _thCtrl.text,
-                          }, (d) => _fetchProfileData());
-                        },
+
+            SizedBox(height: 16),
+            if (_userData != null && ['STUDENT', 'RED_FLAG'].contains(_userData!['role'])) ...[
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      TextField(controller: _fbCtrl, decoration: InputDecoration(labelText: 'Facebook URL', prefixIcon: Icon(Icons.facebook, color: Colors.blue))),
+                      SizedBox(height: 10),
+                      TextField(controller: _zlCtrl, decoration: InputDecoration(labelText: 'Zalo URL', prefixIcon: Icon(Icons.chat, color: Colors.blueAccent))),
+                      SizedBox(height: 10),
+                      TextField(controller: _ttCtrl, decoration: InputDecoration(labelText: 'TikTok URL', prefixIcon: Icon(Icons.music_note, color: Colors.black))),
+                      SizedBox(height: 10),
+                      TextField(controller: _igCtrl, decoration: InputDecoration(labelText: 'Instagram URL', prefixIcon: Icon(Icons.camera_alt, color: Colors.pink))),
+                      SizedBox(height: 10),
+                      TextField(controller: _ytCtrl, decoration: InputDecoration(labelText: 'YouTube URL', prefixIcon: Icon(Icons.play_circle, color: Colors.red))),
+                      SizedBox(height: 10),
+                      TextField(controller: _ghCtrl, decoration: InputDecoration(labelText: 'GitHub URL', prefixIcon: Icon(Icons.code, color: Colors.black87))),
+                      SizedBox(height: 10),
+                      TextField(controller: _thCtrl, decoration: InputDecoration(labelText: 'Threads URL', prefixIcon: Icon(Icons.alternate_email, color: Colors.black))),
+                      SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          icon: Icon(Icons.save),
+                          label: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu MXH' : 'Save Social Media'),
+                          onPressed: () {
+                            _apiPost({
+                              'facebook_url': _fbCtrl.text,
+                              'zalo_url': _zlCtrl.text,
+                              'tiktok_url': _ttCtrl.text,
+                              'instagram_url': _igCtrl.text,
+                              'youtube_url': _ytCtrl.text,
+                              'github_url': _ghCtrl.text,
+                              'threads_url': _thCtrl.text,
+                            }, (d) => _fetchProfileData());
+                          },
+                        ),
                       ),
-                    )
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+              SizedBox(height: 16),
+            ],
+
             SizedBox(height: 16),
             Card(
               elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
