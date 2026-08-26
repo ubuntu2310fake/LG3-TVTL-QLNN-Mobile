@@ -2,7 +2,7 @@
 
 Chào mừng đến với kho lưu trữ mã nguồn ứng dụng di động chính thức của **Trường THPT Lạng Giang số 3**. Ứng dụng được phát triển nhằm mục đích hiện đại hóa công tác quản lý học đường và hỗ trợ sức khỏe tinh thần cho học sinh.
 
-![Version](https://img.shields.io/badge/version-2.0.6__hf2-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.6__hf3-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Android-green.svg)
 ![Flutter](https://img.shields.io/badge/built_with-Flutter-02569B.svg)
 ![License](https://img.shields.io/badge/license-GPLv3-orange.svg)

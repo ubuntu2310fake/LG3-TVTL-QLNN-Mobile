@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class ConsultingTestScreen extends StatefulWidget {
   const ConsultingTestScreen({super.key});
@@ -428,6 +429,113 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
     );
   }
 
+  
+  
+
+  Widget _buildChart(String type, String resultStr, bool isDark) {
+    try {
+      final Map<String, dynamic> data = jsonDecode(resultStr);
+      if (data.isEmpty) return const SizedBox();
+
+      final List<MapEntry<String, dynamic>> entries = data.entries.toList();
+      double maxY = 0;
+      for (var e in entries) {
+        double val = (e.value as num).toDouble();
+        if (val > maxY) maxY = val;
+      }
+      if (maxY < 5) maxY = 5;
+
+      if (type.toUpperCase() == 'HOLLAND') {
+        return Container(
+          height: 250,
+          margin: const EdgeInsets.only(top: 15, bottom: 5),
+          child: RadarChart(
+            RadarChartData(
+              dataSets: [
+                RadarDataSet(
+                  fillColor: Colors.blueAccent.withValues(alpha: 0.2),
+                  borderColor: Colors.blueAccent,
+                  entryRadius: 3,
+                  dataEntries: entries.map((e) => RadarEntry(value: (e.value as num).toDouble())).toList(),
+                )
+              ],
+              radarBackgroundColor: Colors.transparent,
+              borderData: FlBorderData(show: false),
+              radarBorderData: const BorderSide(color: Colors.transparent),
+              titlePositionPercentageOffset: 0.2,
+              titleTextStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 11, fontWeight: FontWeight.bold),
+              getTitle: (index, angle) {
+                return RadarChartTitle(text: entries[index].key);
+              },
+              tickCount: 4,
+              ticksTextStyle: const TextStyle(color: Colors.transparent, fontSize: 10),
+              tickBorderData: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+              gridBorderData: BorderSide(color: Colors.grey.withValues(alpha: 0.3), width: 1),
+            ),
+          ),
+        );
+      }
+
+      maxY += 2;
+      return Container(
+        height: 200,
+        margin: const EdgeInsets.only(top: 15, bottom: 5),
+        child: BarChart(
+          BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            maxY: maxY,
+            barTouchData: BarTouchData(enabled: true),
+            titlesData: FlTitlesData(
+              show: true,
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  getTitlesWidget: (value, meta) {
+                    if (value < 0 || value >= entries.length) return const SizedBox();
+                    String text = entries[value.toInt()].key;
+                    if (text.length > 3) text = text.substring(0, 3);
+                    return SideTitleWidget(
+                      axisSide: meta.axisSide,
+                      child: Text(text, style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 10)),
+                    );
+                  },
+                ),
+              ),
+              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: (maxY / 4).ceilToDouble() > 0 ? (maxY / 4).ceilToDouble() : 1,
+              getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.withValues(alpha: 0.2), strokeWidth: 1),
+            ),
+            borderData: FlBorderData(show: false),
+            barGroups: List.generate(entries.length, (i) {
+              double val = (entries[i].value as num).toDouble();
+              return BarChartGroupData(
+                x: i,
+                barRods: [
+                  BarChartRodData(
+                    toY: val,
+                    color: Colors.blueAccent,
+                    width: 14,
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(4)),
+                  )
+                ],
+              );
+            }),
+          ),
+        ),
+      );
+    } catch (e) {
+      return Text(resultStr, style: TextStyle(color: isDark ? Colors.white : Colors.black));
+    }
+  }
+
+
   Widget _buildHistoryTab(bool isDark) {
     final cardBg = isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF);
     final textColor = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1D1D1F);
@@ -465,7 +573,13 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
                         title: Text('${item['test_type']}', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item['created_at']}\n${item['result_data']}', style: TextStyle(color: textColor)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${item['created_at']}', style: TextStyle(color: textColor)),
+                            _buildChart('${item['test_type']}', '${item['result_data']}', isDark),
+                          ],
+                        ),
                         trailing: IconButton(
                           icon: Icon(Icons.delete, color: Colors.red),
                           onPressed: () => _deleteHistory(item['id']),
