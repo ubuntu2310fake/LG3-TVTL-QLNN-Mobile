@@ -6,15 +6,6 @@ on:
       - '*'
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Loại Release (patch_only, fast_patch, hoặc full_apks)'
-        required: true
-        default: 'patch_only'
-        type: choice
-        options:
-          - patch_only
-          - fast_patch
-          - full_apks
       version_tag:
         description: 'Phiên bản (Ví dụ: 2.0.6_hf5)'
         required: false
@@ -25,12 +16,8 @@ on:
         default: 'Hotfix 2.0.6_hf5: Cập nhật quản lý học sinh, kiểm tra cổng và bảng điều khiển giáo viên'
 
 jobs:
-  # ==============================================================
-  # JOB 1: TẠO FILE PATCH RIÊNG BIỆT (KHÔNG CẦN BUILD FULL APK)
-  # ==============================================================
-  build_patch:
-    name: ⚡ Fast Patch Only (${{ inputs.version_tag || github.ref_name }})
-    if: github.event_name == 'push' || inputs.release_type == 'patch_only' || inputs.release_type == 'fast_patch'
+  build_and_release:
+    name: 🚀 Build & Release LG3 App (${{ inputs.version_tag || github.ref_name }})
     runs-on: ubuntu-latest
 
     steps:
@@ -73,121 +60,52 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > android/app/lg3-release.jks
+          cp android/app/lg3-release.jks android/lg3-release.jks
           echo "storePassword=$STORE_PASSWORD" > android/key.properties
           echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
           echo "storeFile=lg3-release.jks" >> android/key.properties
+          cp android/key.properties android/app/key.properties
 
-      - name: "⚡ Cắt Patch siêu gọn (Chỉ trích xuất libapp.so & flutter_assets)"
+      - name: "🚀 Build Split APKs (arm64 & v7a)"
+        run: flutter build apk --split-per-abi
+
+      - name: "⚡ Tạo File Patch và Đóng gói Artifacts"
         run: |
-          mkdir -p patch_artifacts patch_temp
+          mkdir -p release_artifacts patch_temp
           TAG_NAME="${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG_NAME="${{ inputs.version_tag }}"
           fi
 
-          # 1. Biên dịch Dart AOT arm64
-          flutter build apk --target-platform android-arm64
-          
-          # 2. Đổi tên lưu bản APK arm64
-          cp build/app/outputs/flutter-apk/app-release.apk patch_artifacts/LG3_TVTL_QLNN_Android_arm64-v8a.apk
-          
-          # 3. TRÍCH XUẤT CHÍNH XÁC PHẦN CODE VÀ ASSETS (Không lấy Engine/Native cồng kềnh)
-          unzip -q build/app/outputs/flutter-apk/app-release.apk "lib/arm64-v8a/libapp.so" "assets/flutter_assets/*" -d patch_temp/
-          
-          # 4. Đóng gói thành file Patch siêu nhẹ (~3MB - 5MB)
-          cd patch_temp
-          zip -r -9 ../patch_artifacts/patch_${TAG_NAME}.patch .
-          cd ..
-          rm -rf patch_temp
-
-          sha256sum patch_artifacts/* > patch_artifacts/checksums.txt
-
-      - name: "📤 Đẩy file Patch lên GitHub Release ngay tức thì"
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
-          name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
-          body: ${{ github.event_name == 'workflow_dispatch' && inputs.patch_note || '' }}
-          files: |
-            patch_artifacts/*
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ==============================================================
-  # JOB 2: BUILD ĐẦY ĐỦ 2 BẢN SPLIT APKs (CHẠY SONG SONG)
-  # ==============================================================
-  build_full_apks:
-    name: 📦 Full Split APKs (${{ inputs.version_tag || github.ref_name }})
-    if: github.event_name == 'push' || inputs.release_type == 'fast_patch' || inputs.release_type == 'full_apks'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: "📥 Tải mã nguồn (Shallow clone)"
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: "☕ Cài đặt Java 17 (Gradle Cache)"
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: 'gradle'
-
-      - name: "🦋 Cài đặt Flutter (Flutter Cache)"
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: "📦 Cache Pub Dependencies"
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
-      - name: "📦 Cài thư viện phụ thuộc"
-        run: flutter pub get
-
-      - name: "🔐 Giải mã Chữ ký số LG3"
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode --ignore-garbage > android/app/lg3-release.jks
-          echo "storePassword=$STORE_PASSWORD" > android/key.properties
-          echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
-          echo "keyAlias=$KEY_ALIAS" >> android/key.properties
-          echo "storeFile=lg3-release.jks" >> android/key.properties
-
-      - name: "🚀 Build Full Split APKs (arm64 & v7a)"
-        run: flutter build apk --split-per-abi
-
-      - name: "🏷️ Đổi tên file chuẩn API"
-        run: |
-          mkdir -p release_artifacts
+          # 1. Đổi tên và sao chép 2 bản APK chính thức
           cd build/app/outputs/flutter-apk/
           mv app-arm64-v8a-release.apk LG3_TVTL_QLNN_Android_arm64-v8a.apk
           mv app-armeabi-v7a-release.apk LG3_TVTL_QLNN_Android_armeabi-v7a.apk
           cp LG3_TVTL_QLNN_Android_arm64-v8a.apk ../../../../release_artifacts/
           cp LG3_TVTL_QLNN_Android_armeabi-v7a.apk ../../../../release_artifacts/
           cd ../../../../
-          sha256sum release_artifacts/* > release_artifacts/checksums.txt
 
-      - name: "📤 Đính kèm Full APKs vào GitHub Release"
+          # 2. Trích xuất file patch từ APK arm64 chính thức đã được ký
+          unzip -q release_artifacts/LG3_TVTL_QLNN_Android_arm64-v8a.apk "lib/arm64-v8a/libapp.so" "assets/flutter_assets/*" -d patch_temp/
+          cd patch_temp
+          zip -r -9 ../release_artifacts/patch_${TAG_NAME}.patch .
+          cd ..
+          rm -rf patch_temp
+
+          # 3. Tạo mã băm SHA-256
+          cd release_artifacts
+          sha256sum LG3_TVTL_QLNN_Android_arm64-v8a.apk LG3_TVTL_QLNN_Android_armeabi-v7a.apk patch_${TAG_NAME}.patch > checksums.txt
+          cd ..
+
+      - name: "📤 Phát hành bản Release lên GitHub"
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
           name: ${{ github.event_name == 'workflow_dispatch' && inputs.version_tag || github.ref_name }}
+          body: ${{ github.event_name == 'workflow_dispatch' && inputs.patch_note || '' }}
           files: |
             release_artifacts/*
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
