@@ -35,6 +35,8 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}
     );
     
+    if (!mounted) return;
+
     final data = jsonDecode(res.body);
     if (data['status'] == 'success') {
       setState(() { 
@@ -113,7 +115,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(LocalizationService().currentLanguage == 'vi' ? "${s['code']} - Lớp: ${s['class_name']}" : "${s['code']} - Class: ${s['class_name']}"),
+                      Text(LocalizationService().currentLanguage == 'vi' ? (s['thuylinh'] != null ? "STT ${s['thuylinh']} • ${s['code']} - Lớp: ${s['class_name']}" : "${s['code']} - Lớp: ${s['class_name']}") : (s['thuylinh'] != null ? "STT ${s['thuylinh']} • ${s['code']} - Class: ${s['class_name']}" : "${s['code']} - Class: ${s['class_name']}")),
                       if (s['dob'] != null && s['dob'].toString().isNotEmpty)
                         Text(LocalizationService().currentLanguage == 'vi' ? "Ngày sinh: ${s['dob']}" : "DOB: ${s['dob']}", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                       if (s['role'] == 'RED_FLAG')

@@ -211,7 +211,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   onTap: () => _showEditExemptionDialog(s),
                   leading: CircleAvatar(child: Text(s['name'][0])), 
                   title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)), 
-                  subtitle: Text(s['code']), 
+                  subtitle: Text(s['thuylinh'] != null ? "STT ${s['thuylinh']} • ${s['code']}" : s['code']), 
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

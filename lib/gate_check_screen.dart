@@ -168,7 +168,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
 
       await OfflineQueueService.enqueue(
         url: '${AppConfig.baseUrl}/api/gate_check_api.php', method: 'POST', contentType: 'application/x-www-form-urlencoded', body: bodyParts.join('&'),
-        title: LocalizationService().currentLanguage == 'vi' ? 'Trực cổng: ${_selectedStudent![' : ']} - Lop ${_selectedStudent!['class_name']}' : 'Gate duty: ${_selectedStudent!['name']} - Class ${_selectedStudent!['class_name']}',
+        title: LocalizationService().currentLanguage == 'vi' ? 'Trực cổng: ${_selectedStudent!['name']} - Lớp ${_selectedStudent!['class_name']}' : 'Gate duty: ${_selectedStudent!['name']} - Class ${_selectedStudent!['class_name']}',
       );
 
       if (mounted) {
@@ -328,7 +328,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                   final s = _searchResults[i];
                   return ListTile(
                     title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(LocalizationService().currentLanguage == 'vi' ? 'Lớp: ${s[' : ']} - Ma: ${s['code']}' : 'Class: ${s['class_name']} - ID: ${s['code']}'),
+                    subtitle: Text(LocalizationService().currentLanguage == 'vi' ? (s['thuylinh'] != null ? 'STT ${s['thuylinh']} • Lớp: ${s['class_name']} - Mã: ${s['code']}' : 'Lớp: ${s['class_name']} - Mã: ${s['code']}') : (s['thuylinh'] != null ? 'STT ${s['thuylinh']} • Class: ${s['class_name']} - ID: ${s['code']}' : 'Class: ${s['class_name']} - ID: ${s['code']}')),
                     leading: _buildAvatar(s, 20), // DÙNG AVATAR CHUẨN MỚI
                     onTap: () { setState(() { _selectedStudent = s; _searchResults = []; _searchCtrl.clear(); }); },
                   );
@@ -409,7 +409,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                   decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-                                  child: Text(s['code'], style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey.shade700, fontSize: 10))
+                                  child: Text(s['thuylinh'] != null ? "STT ${s['thuylinh']} • ${s['code']}" : s['code'], style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey.shade700, fontSize: 10))
                                 ),
                               ]
                             ),

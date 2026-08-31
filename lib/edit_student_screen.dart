@@ -22,6 +22,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
   
   final _nameCtrl = TextEditingController();
   final _dobCtrl = TextEditingController();
+  final _sttCtrl = TextEditingController();
   
   int? _classId;
   String _userRole = 'STUDENT';
@@ -47,6 +48,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         _classes = data['classes'];
         _nameCtrl.text = _student['name']; 
         _dobCtrl.text = _student['dob'] ?? ''; 
+        _sttCtrl.text = _student['thuylinh']?.toString() ?? '';
         _classId = _student['class_id'];
         _currentImageUrl = _student['image_url'];
         
@@ -91,6 +93,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
     request.fields['id'] = _student['id'].toString();
     request.fields['name'] = _nameCtrl.text;
     request.fields['dob'] = _dobCtrl.text;
+    request.fields['thuylinh'] = _sttCtrl.text;
     request.fields['class_id'] = _classId.toString();
     request.fields['user_role'] = _userRole;
     request.fields['standing_class_id'] = _standingClassId?.toString() ?? '';
@@ -182,6 +185,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
             SizedBox(height: 20),
 
             TextField(controller: TextEditingController(text: _student['code']), decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Mã HS (SBD)' : 'Student Code (ID)', border: OutlineInputBorder(), filled: true, fillColor: isDark ? Colors.grey[800] : Color(0xFFF5F5F5)), readOnly: true), SizedBox(height: 15),
+            TextField(controller: _sttCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'STT trong lớp (Tùy chọn)' : 'Class Order (Optional)', border: OutlineInputBorder()), keyboardType: TextInputType.number), SizedBox(height: 15),
             TextField(controller: _nameCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Họ và tên' : 'Full Name', border: OutlineInputBorder())), SizedBox(height: 15),
             TextField(controller: _dobCtrl, decoration: InputDecoration(labelText: LocalizationService().currentLanguage == 'vi' ? 'Ngày sinh (DD/MM/YYYY)' : 'Date of Birth (DD/MM/YYYY)', border: OutlineInputBorder())), SizedBox(height: 15),
             DropdownButtonFormField<int>(
