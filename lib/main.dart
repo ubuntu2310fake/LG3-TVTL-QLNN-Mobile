@@ -24,7 +24,7 @@ import 'config.dart';
 import 'localization_service.dart';
 import 'device_helper.dart';
 
-const String currentAppVersion = "2.0.6_hf7";
+const String currentAppVersion = "2.0.6_hf8";
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
 bool _isProcessingNoti = false;
@@ -270,7 +270,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (rememberToken != null && rememberToken.isNotEmpty) {
       try {
-        final response = await http.post(
+        final response = await AppConfig.client.post(
           Uri.parse('${AppConfig.baseUrl}/api/login_api.php'), 
           body: {
             'remember_token': rememberToken,

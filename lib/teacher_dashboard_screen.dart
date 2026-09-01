@@ -35,7 +35,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       String url = '${AppConfig.baseUrl}/api/teacher_dashboard_api.php';
       if (_week.isNotEmpty) url += '?week=$_week';
 
-      final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
+      final response = await AppConfig.client.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() { 
@@ -58,7 +58,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/teacher_dashboard_api.php'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({'action': 'reset_student_password', 'student_id': student['id']}),
@@ -76,7 +76,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
-      await http.post(
+      await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/teacher_dashboard_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({'action': 'delete_violation', 'id': id}),
@@ -116,7 +116,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               onPressed: () async {
                 final prefs = await SharedPreferences.getInstance();
                 final sessionId = prefs.getString('phpsessid') ?? '';
-                await http.post(
+                await AppConfig.client.post(
                   Uri.parse('${AppConfig.baseUrl}/api/teacher_dashboard_api'),
                   headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
                   body: jsonEncode({

@@ -41,7 +41,7 @@ class _RankingScreenState extends State<RankingScreen> {
       String url = '${AppConfig.baseUrl}/api/ranking_api';
       if (_filterValue.isNotEmpty) url += '?$_filterType=$_filterValue';
 
-      final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
+      final response = await AppConfig.client.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
       final data = jsonDecode(response.body);
 
       if (data['status'] == 'success') {

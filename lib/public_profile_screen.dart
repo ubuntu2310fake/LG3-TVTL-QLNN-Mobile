@@ -37,7 +37,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
-      final res = await http.get(
+      final res = await AppConfig.client.get(
         Uri.parse('${AppConfig.baseUrl}/api/public_profile_api.php?code=${widget.studentCode}'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
       );

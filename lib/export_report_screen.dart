@@ -28,7 +28,7 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
   Future<void> _fetchCurrentWeek() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/ranking_api.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+      final res = await AppConfig.client.get(Uri.parse('${AppConfig.baseUrl}/api/ranking_api.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         if (data['status'] == 'success' && data['current_week'] != null) {
@@ -47,7 +47,7 @@ class _ExportReportScreenState extends State<ExportReportScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
 
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/export_vpbs'),
         headers: {
           'Cookie': 'PHPSESSID=$sessionId',

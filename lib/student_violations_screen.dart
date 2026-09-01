@@ -33,7 +33,7 @@ class _StudentViolationsScreenState extends State<StudentViolationsScreen> {
     if (weekParam != null) url += '?week=$weekParam';
     
     try {
-      final res = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+      final res = await AppConfig.client.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
       final data = jsonDecode(res.body);
       if (data['status'] == 'success') {
         setState(() {

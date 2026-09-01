@@ -194,7 +194,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/gate_check_api.php'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'},
         body: 'delete_id=$id'

@@ -30,7 +30,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
     setState(() { _isLoading = true; _currentPage = page; });
     final prefs = await SharedPreferences.getInstance();
     
-    final res = await http.get(
+    final res = await AppConfig.client.get(
       Uri.parse('${AppConfig.baseUrl}/api/manage_students_api?search=$_search&class_id=$_classId&page=$_currentPage'), 
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}
     );
@@ -52,7 +52,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
 
   Future<void> _quickApprove(String code) async {
     final prefs = await SharedPreferences.getInstance();
-    await http.post(
+    await AppConfig.client.post(
       Uri.parse('${AppConfig.baseUrl}/api/manage_students_api'), 
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, 
       body: jsonEncode({'action': 'quick_approve', 'code': code})

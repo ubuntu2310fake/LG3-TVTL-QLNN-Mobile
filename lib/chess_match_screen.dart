@@ -38,7 +38,7 @@ class _ChessMatchScreenState extends State<ChessMatchScreen> {
 
   Future<void> _fetchState() async {
     try {
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
         headers: {'Cookie': 'PHPSESSID=${await _getSession()}'},
         body: {'action': 'get_state', 'match_id': widget.matchId.toString()},
@@ -68,7 +68,7 @@ class _ChessMatchScreenState extends State<ChessMatchScreen> {
   Future<void> _makeMove() async {
     final fen = _controller.getFen();
     try {
-      await http.post(
+      await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
         headers: {'Cookie': 'PHPSESSID=${await _getSession()}'},
         body: {
@@ -113,7 +113,7 @@ class _ChessMatchScreenState extends State<ChessMatchScreen> {
                 SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
-                    await http.post(
+                    await AppConfig.client.post(
                       Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
                       headers: {'Cookie': 'PHPSESSID=${await _getSession()}'},
                       body: {'action': 'resign', 'match_id': widget.matchId.toString()},

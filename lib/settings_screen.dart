@@ -80,14 +80,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         String realModel = await DeviceHelper.getDeviceModel();
 
         if (fcmToken != null) {
-          await http.post(
+          await AppConfig.client.post(
             Uri.parse('${AppConfig.baseUrl}/api/subscribe'),
             headers: {'Content-Type': 'application/json', 'Cookie': 'PHPSESSID=$sessionId'},
             body: jsonEncode({'endpoint': fcmToken, 'platform': 'app', 'device_model': realModel}),
           );
         }
       } else {
-        await http.post(
+        await AppConfig.client.post(
           Uri.parse('${AppConfig.baseUrl}/gate_check'),
           headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
           body: 'delete_id=0&only_push=1' 

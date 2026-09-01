@@ -37,7 +37,7 @@ class _ViolationHistoryScreenState extends State<ViolationHistoryScreen> {
       
       final String url = '${AppConfig.baseUrl}/api/violation_history_api?page_gate=$_pageGate&page_class=$_pageClass';
 
-      final response = await http.get(
+      final response = await AppConfig.client.get(
         Uri.parse(url),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
       );
@@ -84,7 +84,7 @@ class _ViolationHistoryScreenState extends State<ViolationHistoryScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/violation_history_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({'action': 'delete', 'delete_id': id}),
@@ -135,7 +135,7 @@ class _ViolationHistoryScreenState extends State<ViolationHistoryScreen> {
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
               final sessionId = prefs.getString('phpsessid') ?? '';
-              await http.post(
+              await AppConfig.client.post(
                 Uri.parse('${AppConfig.baseUrl}/api/violation_history_api'),
                 headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
                 body: jsonEncode({

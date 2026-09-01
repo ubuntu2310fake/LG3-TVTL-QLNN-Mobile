@@ -92,7 +92,7 @@ class _ClassCheckScreenState extends State<ClassCheckScreen> {
       
       final String url = '${AppConfig.baseUrl}/api/class_check_api.php?action=load_matrix&class_id=$_selectedClassId&week=${_weekCtrl.text}';
       
-      final response = await http.get(
+      final response = await AppConfig.client.get(
         Uri.parse(url),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
       );
@@ -199,7 +199,7 @@ class _ClassCheckScreenState extends State<ClassCheckScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
 
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/class_check_api.php?action=save_matrix'), 
         headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Cookie': 'PHPSESSID=$sessionId' },
         body: jsonEncode(payload),

@@ -25,7 +25,7 @@ class _TrafficMonitorScreenState extends State<TrafficMonitorScreen> {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     try {
-      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/traffic_monitor_api?range=$_range'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+      final res = await AppConfig.client.get(Uri.parse('${AppConfig.baseUrl}/api/traffic_monitor_api?range=$_range'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
       final data = jsonDecode(res.body);
       if (data['status'] == 'success') {
         setState(() { _overview = data['overview']; _stats = data['stats']; _isLoading = false; });

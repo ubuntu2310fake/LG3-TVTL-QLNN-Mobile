@@ -250,7 +250,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       try {
         final sessionId = prefs.getString('phpsessid') ?? '';
         if (sessionId.isNotEmpty) {
-          final res = await http.get(
+          final res = await AppConfig.client.get(
             Uri.parse('${AppConfig.baseUrl}/api/profile_api.php'),
             headers: {'Cookie': 'PHPSESSID=$sessionId'},
           );
@@ -479,7 +479,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             try {
                               final prefs = await SharedPreferences.getInstance();
                               final sessionId = prefs.getString('phpsessid') ?? '';
-                              final res = await http.post(
+                              final res = await AppConfig.client.post(
                                 Uri.parse('${AppConfig.baseUrl}/api/change_password_api.php'),
                                 headers: {'Cookie': 'PHPSESSID=$sessionId'},
                                 body: {
@@ -539,7 +539,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       _isForceChangePassShown = false;
                       try {
                         final prefs = await SharedPreferences.getInstance();
-                        await http.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
+                        await AppConfig.client.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'});
                         await prefs.clear();
                       } catch (_) {}
                       if (!mounted) return;
@@ -1101,7 +1101,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               Navigator.pop(ctx);
               final prefs = await SharedPreferences.getInstance();
               final sessionId = prefs.getString('phpsessid') ?? '';
-              http.post(
+              AppConfig.client.post(
                 Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
                 headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=decline&match_id=$matchId',
@@ -1114,7 +1114,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               Navigator.pop(ctx);
               final prefs = await SharedPreferences.getInstance();
               final sessionId = prefs.getString('phpsessid') ?? '';
-              final res = await http.post(
+              final res = await AppConfig.client.post(
                 Uri.parse('${AppConfig.baseUrl}/api/chess_api.php'),
                 headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=accept&match_id=$matchId',
@@ -1196,7 +1196,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(context: context, builder: (context) => AlertDialog(title: Text(LocalizationService().currentLanguage == 'vi' ? 'Xác nhận' : 'Confirm', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), content: Text(LocalizationService().currentLanguage == 'vi' ? 'Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?' : 'Are you sure you want to log out from this device?', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing)), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text(LocalizationService().currentLanguage == 'vi' ? 'Hủy' : 'Cancel', style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing))), TextButton(onPressed: () => Navigator.pop(context, true), child: Text(T('logout', def: LocalizationService().currentLanguage == 'vi' ? 'Đăng xuất' : 'Logout'), style: TextStyle(fontFeatures: _interFeatures, letterSpacing: _interSpacing, color: Colors.red)))]));
     if (confirm != true) return;
-    try { final prefs = await SharedPreferences.getInstance(); await http.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}); } catch (e) {}
+    try { final prefs = await SharedPreferences.getInstance(); await AppConfig.client.get(Uri.parse('${AppConfig.baseUrl}/logout.php'), headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}); } catch (e) {}
     final prefs = await SharedPreferences.getInstance(); await prefs.clear();
     if (!mounted) return; Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }

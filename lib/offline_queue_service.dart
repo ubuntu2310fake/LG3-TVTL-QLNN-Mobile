@@ -1,3 +1,4 @@
+import 'config.dart';
 import 'localization_service.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -133,13 +134,13 @@ class OfflineQueueService {
 
         http.Response response;
         if (item['method'] == 'POST') {
-          response = await http.post(
+          response = await AppConfig.client.post(
             Uri.parse(item['url']),
             headers: headers,
             body: item['body'],
           ).timeout(const Duration(seconds: 15));
         } else {
-          response = await http.get(
+          response = await AppConfig.client.get(
             Uri.parse(item['url']), 
             headers: headers
           ).timeout(const Duration(seconds: 15));

@@ -40,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final sessionId = prefs.getString('phpsessid') ?? '';
 
       // ĐÃ BỎ ĐUÔI .php
-      final response = await http.get(
+      final response = await AppConfig.client.get(
         Uri.parse('${AppConfig.baseUrl}/api/profile_api.php'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
       );
@@ -167,7 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/profile_api.php'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
         body: {'action': 'delete_avatar'},
@@ -200,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/profile_api.php'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
         body: {'action': 'delete_device', 'device_id': targetSessionId},
@@ -222,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         String? fcmToken = await messaging.getToken();
         String realModel = await DeviceHelper.getDeviceModel();
         if (fcmToken != null) {
-          final response = await http.post(
+          final response = await AppConfig.client.post(
             Uri.parse('${AppConfig.baseUrl}/api/subscribe'),
             headers: {'Content-Type': 'application/json', 'Cookie': 'PHPSESSID=$sessionId'},
             body: jsonEncode({'endpoint': fcmToken, 'platform': 'app', 'device_model': realModel}),
@@ -233,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
         }
       } else {
-        await http.post(
+        await AppConfig.client.post(
           Uri.parse('${AppConfig.baseUrl}/gate_check'),
           headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/x-www-form-urlencoded'},
           body: 'delete_id=0&only_push=1' 
@@ -271,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     final sessionId = prefs.getString('phpsessid') ?? '';
     try {
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/profile_api.php'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
         body: body,
@@ -493,7 +493,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   final prefs = await SharedPreferences.getInstance();
                   final sessionId = prefs.getString('phpsessid') ?? '';
                   try {
-                    final res = await http.post(
+                    final res = await AppConfig.client.post(
                       Uri.parse('${AppConfig.baseUrl}/api/change_password_api.php'),
                       headers: {'Cookie': 'PHPSESSID=$sessionId'},
                       body: {'action': 'change_password', 'old_password': oldCtrl.text, 'new_password': newCtrl.text, 'confirm_password': confirmCtrl.text},

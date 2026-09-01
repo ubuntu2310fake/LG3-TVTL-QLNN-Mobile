@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       String deviceName = await DeviceHelper.getDeviceModel();
 
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/login_api.php'), 
         body: {
           'username': _usernameCtrl.text.trim(),
@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                       setModalState(() => isSubmitting = true);
                       try {
-                        final res = await http.post(
+                        final res = await AppConfig.client.post(
                           Uri.parse('${AppConfig.baseUrl}/api/forgot_password_api.php'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({'action': 'send_reset_otp', 'username': userCtrl.text.trim()}),
@@ -287,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                       setModalState(() => isSubmitting = true);
                       try {
-                        final res = await http.post(
+                        final res = await AppConfig.client.post(
                           Uri.parse('${AppConfig.baseUrl}/api/forgot_password_api.php'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({

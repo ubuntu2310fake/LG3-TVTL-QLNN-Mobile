@@ -38,7 +38,7 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
       String url = '${AppConfig.baseUrl}/api/input_academic_api';
       if (_week.isNotEmpty) url += '?week=$_week';
 
-      final response = await http.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
+      final response = await AppConfig.client.get(Uri.parse(url), headers: {'Cookie': 'PHPSESSID=$sessionId'});
       final data = jsonDecode(response.body);
 
       if (data['status'] == 'success') {
@@ -100,7 +100,7 @@ class _InputAcademicScreenState extends State<InputAcademicScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
       
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('${AppConfig.baseUrl}/api/input_academic_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({'week': _week, 'scores': scoresToSave}),

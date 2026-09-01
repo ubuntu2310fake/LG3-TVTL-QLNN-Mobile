@@ -37,7 +37,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
   Future<void> _fetchData() async {
     final prefs = await SharedPreferences.getInstance();
-    final res = await http.get(
+    final res = await AppConfig.client.get(
       Uri.parse('${AppConfig.baseUrl}/api/edit_student_api?code=${widget.studentCode}'), 
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}
     );
@@ -72,7 +72,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
 
   Future<void> _handlePending(String action) async {
     final prefs = await SharedPreferences.getInstance();
-    await http.post(
+    await AppConfig.client.post(
       Uri.parse('${AppConfig.baseUrl}/api/edit_student_api'), 
       headers: {'Cookie': 'PHPSESSID=${prefs.getString('phpsessid')}'}, 
       body: jsonEncode({'action': action, 'id': _student['id']})

@@ -18,7 +18,7 @@ class OfflineSyncService {
   // 1. TẢI CỤC MÃ HÓA SERVER VỀ LƯU TRỰC TIẾP
   static Future<bool> syncData() async {
     try {
-      final res = await http.get(Uri.parse('${AppConfig.baseUrl}/api/sync_data_secure.php'));
+      final res = await AppConfig.client.get(Uri.parse('${AppConfig.baseUrl}/api/sync_data_secure.php'));
       final data = jsonDecode(res.body);
       if (data['status'] == 'success' && data['secure_payload'] != null) {
         final file = await _getFile();
@@ -56,7 +56,7 @@ class OfflineSyncService {
   static Future<void> syncUserAvatar(String sessionId) async {
     try {
       if (sessionId.isEmpty) return;
-      final res = await http.get(
+      final res = await AppConfig.client.get(
         Uri.parse('${AppConfig.baseUrl}/api/profile_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId'},
       );
@@ -71,7 +71,7 @@ class OfflineSyncService {
         }
 
         if (rawAvatar.isNotEmpty && !rawAvatar.contains('default.png')) {
-          final imgRes = await http.get(Uri.parse(fullAvatarUrl));
+          final imgRes = await AppConfig.client.get(Uri.parse(fullAvatarUrl));
           if (imgRes.statusCode == 200) {
             final dir = await getApplicationDocumentsDirectory();
             final avatarFile = File('${dir.path}/user_avatar.png');

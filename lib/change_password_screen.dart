@@ -1,3 +1,4 @@
+import 'config.dart';
 import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -32,7 +33,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
 
-      final response = await http.post(
+      final response = await AppConfig.client.post(
         Uri.parse('https://qlnn.testifiyonline.xyz/api/change_password_api'),
         headers: {'Cookie': 'PHPSESSID=$sessionId', 'Content-Type': 'application/json'},
         body: jsonEncode({

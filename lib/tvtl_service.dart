@@ -25,7 +25,7 @@ class TvtlService {
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
       
-      final res = await http.get(Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/list_teachers'), headers: {'Cookie': cookieHeader});
+      final res = await AppConfig.client.get(Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/list_teachers'), headers: {'Cookie': cookieHeader});
       
       if (res.statusCode == 200) {
         List<dynamic> data = jsonDecode(res.body);
@@ -46,7 +46,7 @@ class TvtlService {
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
       
-      final res = await http.get(Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/teacher/get_conversations'), headers: {'Cookie': cookieHeader});
+      final res = await AppConfig.client.get(Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/teacher/get_conversations'), headers: {'Cookie': cookieHeader});
       
       if (res.statusCode == 200) {
         List<dynamic> data = jsonDecode(res.body);
@@ -68,7 +68,7 @@ class TvtlService {
       final cookieHeader = 'PHPSESSID=$phpSession';
       
       // Đã chuyển sang dùng chung API /api/chat/get&include_info=1 như bản Web (hỗ trợ Reply, Reaction)
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/get&include_info=1'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'partner_id': partnerId}),
@@ -86,7 +86,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/send'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({
@@ -108,7 +108,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/clear'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'partner_id': partnerId}),
@@ -156,7 +156,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/delete'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'message_id': messageId}),
@@ -175,7 +175,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_ai.php?local_api=1'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({
@@ -201,7 +201,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.get(
+      final res = await AppConfig.client.get(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/list'),
         headers: {'Cookie': cookieHeader},
       );
@@ -216,7 +216,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/search'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'query': query}),
@@ -232,7 +232,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/request'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'target_id': targetId}),
@@ -250,7 +250,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/respond'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'req_id': reqId, 'action': action}),
@@ -268,7 +268,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/cancel'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'target_id': targetId}),
@@ -286,7 +286,7 @@ class TvtlService {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
-      final res = await http.post(
+      final res = await AppConfig.client.post(
         Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/friends/unfriend'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'target_id': targetId}),
