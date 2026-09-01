@@ -61,15 +61,15 @@ class TvtlService {
     return [];
   }
 
-  static Future<List<dynamic>> getChatHistory({required String partnerId}) async {
+  static Future<Map<String, dynamic>?> getChatHistory({required String partnerId}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final phpSession = prefs.getString('phpsessid') ?? '';
       final cookieHeader = 'PHPSESSID=$phpSession';
       
-      // Đã chuyển sang dùng chung API /api/chat/get như bản Web (hỗ trợ Reply, Reaction)
+      // Đã chuyển sang dùng chung API /api/chat/get&include_info=1 như bản Web (hỗ trợ Reply, Reaction)
       final res = await http.post(
-        Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/get'),
+        Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/get&include_info=1'),
         headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
         body: jsonEncode({'partner_id': partnerId}),
       );
@@ -78,7 +78,7 @@ class TvtlService {
         return jsonDecode(res.body);
       }
     } catch (e) { print(LocalizationService().currentLanguage == 'vi' ? "Lỗi tải tin nhắn: $e" : "Error loading messages: $e"); }
-    return [];
+    return null;
   }
 
   static Future<Map<String, dynamic>?> sendMessage(String content, {required String partnerId, int? replyId, bool isAnonymous = false}) async {

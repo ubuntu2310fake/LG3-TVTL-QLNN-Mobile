@@ -35,12 +35,14 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
   Map<String, dynamic>? _replyingToMessage; 
   bool _isAnonymous = false;
   String _myRole = 'STUDENT';
+  String _currentPartnerName = '';
 
   bool get _canAnonymous => ['STUDENT', 'RED_FLAG'].contains(_myRole) && widget.isTeacher;
 
   @override
   void initState() {
     super.initState();
+    _currentPartnerName = widget.partnerName;
     _loadUserRole();
     _loadMessages(forceScroll: true);
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _loadMessages(forceScroll: false));
@@ -64,12 +66,26 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
   }
 
   Future<void> _loadMessages({required bool forceScroll}) async {
-    final msgs = await TvtlService.getChatHistory(partnerId: widget.partnerId);
+    final data = await TvtlService.getChatHistory(partnerId: widget.partnerId);
     if (!mounted) return;
     
-    if (_messages.length != msgs.length || _isLoading) {
-      setState(() { _messages = msgs; _isLoading = false; });
-      if (forceScroll) _scrollToBottom();
+    if (data != null) {
+      List<dynamic> msgs = data['messages'] ?? [];
+      String newName = data['partner_name'] ?? widget.partnerName;
+
+      if (_messages.length != msgs.length || _isLoading || _currentPartnerName != newName) {
+        setState(() { 
+          _messages = msgs; 
+          _isLoading = false; 
+          _currentPartnerName = newName;
+          
+          if (_messages.isNotEmpty && _canAnonymous) {
+            bool isAnonNow = _messages.any((m) => m['is_anonymous'] == 1 || m['is_anonymous'] == '1' || m['is_anonymous'] == true);
+            _isAnonymous = isAnonNow;
+          }
+        });
+        if (forceScroll) _scrollToBottom();
+      }
     }
   }
 

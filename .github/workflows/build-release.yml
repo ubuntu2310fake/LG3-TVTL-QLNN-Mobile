@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'Phiên bản (Ví dụ: 2.0.6_hf6)'
+        description: 'Phiên bản (Ví dụ: 2.0.6_hf7)'
         required: false
-        default: '2.0.6_hf6'
+        default: '2.0.6_hf7'
       patch_note:
         description: 'Ghi chú cho bản phát hành (Changelog)'
         required: false
-        default: 'Hotfix 2.0.6_hf6: Tích hợp định dạng khối mã/sao chép mã trong AI tư vấn và xác nhận xóa lịch sử khi chuyển chế độ ẩn danh'
+        default: 'Hotfix 2.0.6_hf7: Tự động nhận diện chế độ ẩn danh và đồng bộ thông tin đối tác chat'
 
 jobs:
   build_and_release:
