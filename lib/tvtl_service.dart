@@ -103,6 +103,25 @@ class TvtlService {
   }
 
   // ĐÃ THÊM: 4. UPLOAD ẢNH CHAT
+  static Future<bool> clearChat(String partnerId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final phpSession = prefs.getString('phpsessid') ?? '';
+      final cookieHeader = 'PHPSESSID=$phpSession';
+      final res = await http.post(
+        Uri.parse('$phpBaseUrl/consulting_chat.php?endpoint=/api/chat/clear'),
+        headers: {'Content-Type': 'application/json', 'Cookie': cookieHeader},
+        body: jsonEncode({'partner_id': partnerId}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data['success'] == true;
+      }
+    } catch (e) {
+      print(LocalizationService().currentLanguage == 'vi' ? "Lỗi clearChat: $e" : "Error clearChat: $e");
+    }
+    return false;
+  }
   static Future<String?> uploadChatFile(String filePath) async {
     try {
       final prefs = await SharedPreferences.getInstance();

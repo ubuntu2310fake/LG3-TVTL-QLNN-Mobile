@@ -1,6 +1,8 @@
-import 'localization_service.dart';
 import 'package:flutter/material.dart';
+import 'localization_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
+import 'package:flutter/services.dart';
 import 'tvtl_service.dart';
 
 class AiConsultingScreen extends StatefulWidget {
@@ -102,6 +104,9 @@ class _AiConsultingScreenState extends State<AiConsultingScreen> {
                     const Divider(color: Colors.black12, height: 20),
                     MarkdownBody(
                       data: _adviceResult!,
+                      builders: {
+                        'code': CodeElementBuilder(context),
+                      },
                       styleSheet: MarkdownStyleSheet(
                         p: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 15, height: 1.5),
                         h3: TextStyle(color: Colors.purple, fontSize: 18, fontWeight: FontWeight.bold),
@@ -115,6 +120,83 @@ class _AiConsultingScreenState extends State<AiConsultingScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class CodeElementBuilder extends MarkdownElementBuilder {
+  final BuildContext context;
+  CodeElementBuilder(this.context);
+
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    var language = '';
+    if (element.attributes['class'] != null) {
+      String lgPattern = r'language-(.+)';
+      RegExp regExp = RegExp(lgPattern);
+      Match? match = regExp.firstMatch(element.attributes['class']!);
+      if (match != null) {
+        language = match.group(1) ?? '';
+      }
+    }
+    
+    // Check if it's a block of code (multiline)
+    if (element.textContent.contains('\n') || language.isNotEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade900,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(language.isEmpty ? 'code' : language, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: element.textContent));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Đã sao chép mã!' : 'Code copied!')));
+                    },
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.copy, size: 14, color: Colors.grey),
+                        SizedBox(width: 4),
+                        Text('Copy', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                element.textContent,
+                style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Inline code
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
+      child: Text(element.textContent, style: TextStyle(fontFamily: 'monospace', color: Theme.of(context).brightness == Brightness.dark ? Colors.yellow.shade200 : Colors.deepOrange)),
     );
   }
 }

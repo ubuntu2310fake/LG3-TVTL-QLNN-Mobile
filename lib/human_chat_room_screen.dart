@@ -226,10 +226,44 @@ class _HumanChatRoomScreenState extends State<HumanChatRoomScreen> {
                   color: _isAnonymous ? const Color(0xFF8B5CF6) : const Color(0xFF8B5CF6).withValues(alpha: 0.3),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                onSelected: (val) {
-                  setState(() {
-                    _isAnonymous = val;
-                  });
+                onSelected: (val) async {
+                  bool confirm = await showDialog(
+                    context: context,
+                    builder: (context) {
+                      bool isVi = LocalizationService().currentLanguage == 'vi';
+                      return AlertDialog(
+                        title: Text(isVi ? 'Xác nhận' : 'Confirm'),
+                        content: Text(isVi
+                            ? (val 
+                                ? "Hệ thống sẽ xóa toàn bộ lịch sử trò chuyện hiện tại với Thầy Cô này để bắt đầu phiên Ẩn danh. Bạn có chắc chắn muốn bật?"
+                                : "Hệ thống sẽ xóa toàn bộ lịch sử trò chuyện Ẩn danh hiện tại với Thầy Cô này để quay lại phiên bình thường. Bạn có chắc chắn muốn tắt?")
+                            : (val 
+                                ? "The system will delete the entire current chat history with this Teacher to start an Anonymous session. Are you sure you want to turn it on?"
+                                : "The system will delete the entire current Anonymous chat history with this Teacher to return to a normal session. Are you sure you want to turn it off?")),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text(isVi ? 'Hủy' : 'Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text(isVi ? 'Đồng ý' : 'Agree', style: const TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      );
+                    }
+                  ) ?? false;
+
+                  if (confirm) {
+                    await TvtlService.clearChat(widget.partnerId);
+                    if (mounted) {
+                      setState(() {
+                        _isAnonymous = val;
+                        _messages.clear();
+                      });
+                      _loadMessages(forceScroll: true);
+                    }
+                  }
                 },
               ),
             ),
