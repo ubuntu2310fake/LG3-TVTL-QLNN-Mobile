@@ -14,7 +14,7 @@ class CloudflareCaptchaService {
 
   /// Kiểm tra xem response từ server có phải là trang Cloudflare Challenge hoặc LG3 Shield Captcha không
   static bool isCloudflareChallenge(int statusCode, String body) {
-    if (statusCode == 403 || statusCode == 503 || statusCode == 429 || statusCode == 302) {
+    if (statusCode == 252 || statusCode == 403 || statusCode == 503 || statusCode == 429 || statusCode == 302) {
       final lower = body.toLowerCase();
       if (lower.contains('challenges.cloudflare.com') ||
           lower.contains('just a moment...') ||
