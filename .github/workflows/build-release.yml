@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'Phiên bản (Ví dụ: 2.0.6_hf10)'
+        description: 'Phiên bản (Ví dụ: 2.0.6_hf11)'
         required: false
-        default: '2.0.6_hf10'
+        default: '2.0.6_hf11'
       patch_note:
         description: 'Ghi chú cho bản phát hành (Changelog)'
         required: false
-        default: 'Hotfix 2.0.6_hf10: Nâng cấp dịch vụ xác thực LG3 Shield Captcha & Cloudflare Turnstile'
+        default: 'Hotfix 2.0.6_hf11: Tự động đánh chặn LG3 Shield/Cloudflare qua AppHttpClient và tự động gửi lại request'
 
 jobs:
   build_and_release:

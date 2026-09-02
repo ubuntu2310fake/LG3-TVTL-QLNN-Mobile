@@ -137,7 +137,7 @@ class TvtlService {
           contentType: MediaType.parse(lookupMimeType(filePath) ?? 'image/jpeg'),
         ));
 
-      final response = await request.send();
+      final response = await AppConfig.client.send(request);
       if (response.statusCode == 200) {
         final resStr = await response.stream.bytesToString();
         final data = jsonDecode(resStr);

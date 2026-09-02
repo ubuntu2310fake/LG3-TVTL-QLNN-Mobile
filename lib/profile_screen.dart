@@ -130,7 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // SỬA LẠI THÀNH 'avatar' ĐỂ KHỚP VỚI PHP SERVER
       request.files.add(await http.MultipartFile.fromPath('avatar', croppedPath));
 
-      var response = await request.send();
+      var response = await AppConfig.client.send(request);
       var responseData = await response.stream.bytesToString();
       var data = jsonDecode(responseData);
 

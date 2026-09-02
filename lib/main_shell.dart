@@ -179,7 +179,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _setupGlobalFCMListeners();
     _checkUpdate(); 
 
-    _notiTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _notiTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       _loadNotifications(isInit: false);
     });
 

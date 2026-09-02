@@ -48,17 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
 
-      // Kiểm tra xem có bị Cloudflare Challenge / Captcha chặn không
-      if (CloudflareCaptchaService.isCloudflareChallenge(response.statusCode, response.body)) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        final solved = await CloudflareCaptchaService().handleChallenge(context);
-        if (solved) {
-          _handleLogin();
-        }
-        return;
-      }
-
+      
       // ĐÃ SỬA: Kiểm tra HTTP Status Code trước khi Decode JSON
       if (response.statusCode == 200) {
         try {

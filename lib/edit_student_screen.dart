@@ -104,7 +104,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
     }
 
     try {
-      var response = await request.send();
+      var response = await AppConfig.client.send(request);
       var responseData = await response.stream.bytesToString();
       var data = jsonDecode(responseData);
       

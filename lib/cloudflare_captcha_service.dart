@@ -10,10 +10,11 @@ class CloudflareCaptchaService {
   factory CloudflareCaptchaService() => _instance;
   CloudflareCaptchaService._internal();
 
-  bool _isChallengeShowing = false;
+bool _isChallengeShowing = false;
+  Completer<bool>? _challengeCompleter;
 
   /// Kiểm tra xem response từ server có phải là trang Cloudflare Challenge hoặc LG3 Shield Captcha không
-  static bool isCloudflareChallenge(int statusCode, String body) {
+static bool isCloudflareChallenge(int statusCode, String body) {
     if (statusCode == 252 || statusCode == 403 || statusCode == 503 || statusCode == 429 || statusCode == 302) {
       final lower = body.toLowerCase();
       if (lower.contains('challenges.cloudflare.com') ||
@@ -23,7 +24,9 @@ class CloudflareCaptchaService {
           lower.contains('ray id:') ||
           lower.contains('captcha_challenge.php') ||
           lower.contains('xác thực bảo vệ lg3') ||
-          lower.contains('lg3 shield')) {
+          lower.contains('lg3 shield') ||
+          lower.contains('<!doctype html') ||
+          lower.contains('<html')) {
         return true;
       }
     }
@@ -32,8 +35,12 @@ class CloudflareCaptchaService {
 
   /// Mở modal WebView để người dùng giải Captcha (Cloudflare Turnstile hoặc LG3 Math Captcha)
   Future<bool> handleChallenge(BuildContext context) async {
-    if (_isChallengeShowing) return false;
+    if (_isChallengeShowing && _challengeCompleter != null) {
+      // Đang hiện popup rồi, các request khác sẽ xếp hàng chờ kết quả
+      return _challengeCompleter!.future;
+    }
     _isChallengeShowing = true;
+    _challengeCompleter = Completer<bool>();
 
     try {
       final result = await showDialog<bool>(
@@ -41,9 +48,15 @@ class CloudflareCaptchaService {
         barrierDismissible: false,
         builder: (ctx) => const CloudflareCaptchaDialog(),
       );
-      return result ?? false;
+      final success = result ?? false;
+      _challengeCompleter?.complete(success);
+      return success;
+    } catch (e) {
+      _challengeCompleter?.complete(false);
+      return false;
     } finally {
       _isChallengeShowing = false;
+      _challengeCompleter = null;
     }
   }
 }
@@ -63,10 +76,6 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
   @override
   void initState() {
     super.initState();
-    _initWebView();
-  }
-
-  void _initWebView() {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent('Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36')
@@ -80,8 +89,22 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
             _checkClearanceCookie();
           },
         ),
-      )
-      ..loadRequest(Uri.parse('${AppConfig.baseUrl}/captcha_challenge.php'));
+      );
+    _initWebView();
+  }
+
+  Future<void> _initWebView() async {
+    // Xóa cookie cũ trong WebView để tránh nhận diện sai thành công từ phiên trước
+    final cookieManager = WebViewCookieManager();
+    await cookieManager.clearCookies();
+    
+    // Đồng bộ xóa trên AppConfig
+    AppConfig.shieldPass = '';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('lg3_shield_pass');
+
+    // Tải trang Captcha
+    _controller.loadRequest(Uri.parse('${AppConfig.baseUrl}/captcha_challenge.php'));
 
     // Định kỳ kiểm tra cookie cf_clearance hoặc lg3_shield_pass
     _cookieCheckTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
