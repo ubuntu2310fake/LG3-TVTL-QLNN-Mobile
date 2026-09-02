@@ -10,6 +10,6 @@ import 'package:lg3_tvtl_qlnn/main.dart';
 
 void main() {
   testWidgets('Smoke test', (WidgetTester tester) async {
-    expect(currentAppVersion, '2.0.6_hf8');
+    expect(currentAppVersion, '2.0.6_hf9');
   });
 }

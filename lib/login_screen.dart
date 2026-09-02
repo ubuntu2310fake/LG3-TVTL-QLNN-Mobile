@@ -1,3 +1,4 @@
+import 'cloudflare_captcha_service.dart';
 import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -46,6 +47,17 @@ class _LoginScreenState extends State<LoginScreen> {
           if (_twoFactorCode != null) 'two_factor_code': _twoFactorCode
         },
       );
+
+      // Kiểm tra xem có bị Cloudflare Challenge / Captcha chặn không
+      if (CloudflareCaptchaService.isCloudflareChallenge(response.statusCode, response.body)) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        final solved = await CloudflareCaptchaService().handleChallenge(context);
+        if (solved) {
+          _handleLogin();
+        }
+        return;
+      }
 
       // ĐÃ SỬA: Kiểm tra HTTP Status Code trước khi Decode JSON
       if (response.statusCode == 200) {
