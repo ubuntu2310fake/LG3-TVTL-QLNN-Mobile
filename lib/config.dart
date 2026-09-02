@@ -61,8 +61,6 @@ if (CloudflareCaptchaService.isCloudflareChallenge(response.statusCode, response
         debugPrint('AppHttpClient: Đã phát hiện LG3 Shield (Mã ${response.statusCode})');
         
         final context = navigatorKey.currentState?.context;
-        debugPrint('AppHttpClient: navigatorKey.currentState = ${navigatorKey.currentState}');
-        debugPrint('AppHttpClient: context = $context');
         
         if (context != null) {
           // Bật Popup giải Captcha và chờ người dùng giải xong

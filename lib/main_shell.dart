@@ -179,7 +179,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _setupGlobalFCMListeners();
     _checkUpdate(); 
 
-    _notiTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _notiTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       _loadNotifications(isInit: false);
     });
 
@@ -632,7 +632,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       if (!hasAsked && mounted) {
         _hasPromptedThisSession = true;
         await prefs.setBool('has_prompted_default_links_v2', true); // Ghi ngay vào đĩa để không bao giờ hỏi lại lần 2
-        Future.delayed(const Duration(seconds: 2), () {
+        Future.delayed(const Duration(seconds: 15), () {
           if (mounted) _showDefaultLinkDialog();
         });
       }
