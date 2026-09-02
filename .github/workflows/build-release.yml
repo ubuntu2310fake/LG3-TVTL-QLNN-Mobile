@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'Phiên bản (Ví dụ: 2.0.6_hf9)'
+        description: 'Phiên bản (Ví dụ: 2.0.6_hf10)'
         required: false
-        default: '2.0.6_hf9'
+        default: '2.0.6_hf10'
       patch_note:
         description: 'Ghi chú cho bản phát hành (Changelog)'
         required: false
-        default: 'Hotfix 2.0.6_hf9: Tích hợp xử lý Cloudflare Captcha Challenge và tối ưu chu kỳ tải thông báo'
+        default: 'Hotfix 2.0.6_hf10: Nâng cấp dịch vụ xác thực LG3 Shield Captcha & Cloudflare Turnstile'
 
 jobs:
   build_and_release:

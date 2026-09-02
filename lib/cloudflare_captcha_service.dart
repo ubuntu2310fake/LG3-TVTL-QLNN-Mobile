@@ -12,22 +12,25 @@ class CloudflareCaptchaService {
 
   bool _isChallengeShowing = false;
 
-  /// Kiểm tra xem response từ server có phải là trang Cloudflare Challenge không
+  /// Kiểm tra xem response từ server có phải là trang Cloudflare Challenge hoặc LG3 Shield Captcha không
   static bool isCloudflareChallenge(int statusCode, String body) {
-    if (statusCode == 403 || statusCode == 503 || statusCode == 429) {
+    if (statusCode == 403 || statusCode == 503 || statusCode == 429 || statusCode == 302) {
       final lower = body.toLowerCase();
       if (lower.contains('challenges.cloudflare.com') ||
           lower.contains('just a moment...') ||
           lower.contains('cf-turnstile') ||
           lower.contains('_cf_chl_opt') ||
-          lower.contains('ray id:')) {
+          lower.contains('ray id:') ||
+          lower.contains('captcha_challenge.php') ||
+          lower.contains('xác thực bảo vệ lg3') ||
+          lower.contains('lg3 shield')) {
         return true;
       }
     }
     return false;
   }
 
-  /// Mở modal WebView để người dùng tick giải Captcha / Turnstile
+  /// Mở modal WebView để người dùng giải Captcha (Cloudflare Turnstile hoặc LG3 Math Captcha)
   Future<bool> handleChallenge(BuildContext context) async {
     if (_isChallengeShowing) return false;
     _isChallengeShowing = true;
@@ -78,10 +81,10 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
           },
         ),
       )
-      ..loadRequest(Uri.parse('${AppConfig.baseUrl}/login.php'));
+      ..loadRequest(Uri.parse('${AppConfig.baseUrl}/captcha_challenge.php'));
 
-    // Định kỳ kiểm tra cookie cf_clearance sau khi người dùng tick giải Turnstile
-    _cookieCheckTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) {
+    // Định kỳ kiểm tra cookie cf_clearance hoặc lg3_shield_pass
+    _cookieCheckTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
       _checkClearanceCookie();
     });
   }
@@ -90,33 +93,45 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
     try {
       final cookieString = await _controller.runJavaScriptReturningResult('document.cookie');
       final raw = cookieString.toString();
-      if (raw.contains('cf_clearance')) {
+      bool hasPassed = false;
+      
+      if (raw.contains('cf_clearance') || raw.contains('lg3_shield_pass')) {
         final cookies = raw.replaceAll('"', '').split(';');
+        final prefs = await SharedPreferences.getInstance();
+        
         for (var c in cookies) {
           final parts = c.trim().split('=');
-          if (parts.isNotEmpty && parts[0] == 'cf_clearance' && parts.length > 1) {
+          if (parts.isNotEmpty && parts.length > 1) {
+            final key = parts[0];
             final val = parts.sublist(1).join('=');
-            if (val.isNotEmpty) {
-              final prefs = await SharedPreferences.getInstance();
+            
+            if (key == 'cf_clearance' && val.isNotEmpty) {
               await prefs.setString('cf_clearance', val);
               AppConfig.cfClearance = val;
-              
-              _cookieCheckTimer?.cancel();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(LocalizationService().currentLanguage == 'vi'
-                        ? 'Xác thực bảo mật Cloudflare thành công!'
-                        : 'Cloudflare security verification successful!'),
-                    backgroundColor: Colors.green,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-                Navigator.of(context).pop(true);
-              }
-              return;
+              hasPassed = true;
+            }
+            if (key == 'lg3_shield_pass' && val.isNotEmpty) {
+              await prefs.setString('lg3_shield_pass', val);
+              AppConfig.shieldPass = val;
+              hasPassed = true;
             }
           }
+        }
+      }
+
+      if (hasPassed) {
+        _cookieCheckTimer?.cancel();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(LocalizationService().currentLanguage == 'vi'
+                  ? 'Xác thực bảo vệ thành công!'
+                  : 'Security verification successful!'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          Navigator.of(context).pop(true);
         }
       }
     } catch (_) {}
@@ -140,7 +155,7 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(
-          height: 480,
+          height: 520,
           width: double.infinity,
           child: Column(
             children: [
@@ -153,7 +168,7 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        isVi ? 'Xác thực bảo vệ Cloudflare' : 'Cloudflare Security Verification',
+                        isVi ? 'Xác thực bảo vệ LG3 Shield' : 'LG3 Shield Security Verification',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
@@ -181,8 +196,8 @@ class _CloudflareCaptchaDialogState extends State<CloudflareCaptchaDialog> {
                     Expanded(
                       child: Text(
                         isVi
-                            ? 'Vui lòng nhấn vào ô xác thực phía trên nếu được yêu cầu.'
-                            : 'Please tap the verification box above if prompted.',
+                            ? 'Vui lòng hoàn thành câu đố xác thực bảo vệ phía trên.'
+                            : 'Please complete the security puzzle above.',
                         style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
                       ),
                     ),
