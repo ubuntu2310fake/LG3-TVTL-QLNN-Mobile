@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'localization_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
@@ -22,6 +24,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
   final TextEditingController _weekCtrl = TextEditingController(text: '20');
   
   Map<String, dynamic>? _selectedStudent;
+  File? _evidenceImage;
   bool _isScanning = false;
   bool _isLoading = false;
   
@@ -126,6 +129,91 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
     setState(() => _customDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
 
+  Future<void> _pickEvidence(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 82,
+      );
+      if (picked != null) {
+        setState(() {
+          _evidenceImage = File(picked.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(LocalizationService().currentLanguage == 'vi' ? 'Không thể mở ảnh/camera: $e' : 'Could not open camera/gallery: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  void _removeEvidence() {
+    setState(() {
+      _evidenceImage = null;
+    });
+  }
+
+  void _showEvidenceDialog(String imgPath) {
+    final url = imgPath.startsWith('http') ? imgPath : '${AppConfig.baseUrl}/$imgPath';
+    showDialog(
+      context: context,
+      builder: (c) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      height: 250,
+                      color: Colors.black54,
+                      child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 180,
+                    color: Colors.black54,
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: Text(
+                        LocalizationService().currentLanguage == 'vi' ? 'Không thể tải ảnh bằng chứng' : 'Could not load evidence image',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const CircleAvatar(
+                  backgroundColor: Colors.black54,
+                  child: Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+                onPressed: () => Navigator.pop(c),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _submitViolation() async {
     if (_selectedStudent == null || _selectedViolations.isEmpty) return;
     setState(() => _isLoading = true);
@@ -133,19 +221,26 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionId = prefs.getString('phpsessid') ?? '';
-      var request = http.Request('POST', Uri.parse('${AppConfig.baseUrl}/api/gate_check_api.php'));
-      request.headers['Cookie'] = 'PHPSESSID=$sessionId'; request.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      var request = http.MultipartRequest('POST', Uri.parse('${AppConfig.baseUrl}/api/gate_check_api.php'));
+      request.headers['Cookie'] = 'PHPSESSID=$sessionId';
 
-      List<String> bodyParts = ['student_id=${_selectedStudent!['id']}', 'week=${_weekCtrl.text}', 'other_note=${Uri.encodeQueryComponent(_noteCtrl.text)}'];
+      request.fields['student_id'] = '${_selectedStudent!['id']}';
+      request.fields['week'] = _weekCtrl.text;
+      request.fields['other_note'] = _noteCtrl.text;
+      request.fields['violation_ids'] = _selectedViolations.join(',');
+      request.fields['violation_ids[]'] = _selectedViolations.first.toString();
+
       if (_isCustomTime && _customDateTime != null) {
         String f(int n) => n.toString().padLeft(2, '0');
         String timeStr = '${_customDateTime!.year}-${f(_customDateTime!.month)}-${f(_customDateTime!.day)} ${f(_customDateTime!.hour)}:${f(_customDateTime!.minute)}:00';
-        bodyParts.add('custom_time=${Uri.encodeQueryComponent(timeStr)}');
+        request.fields['custom_time'] = timeStr;
       }
-      for (var vid in _selectedViolations) { bodyParts.add('violation_ids[]=$vid'); }
-      request.body = bodyParts.join('&');
 
-      var response = await http.Client().send(request);
+      if (_evidenceImage != null && await _evidenceImage!.exists()) {
+        request.files.add(await http.MultipartFile.fromPath('evidence_image', _evidenceImage!.path));
+      }
+
+      var response = await AppConfig.client.send(request);
       var responseData = await response.stream.bytesToString();
       var data = jsonDecode(responseData);
 
@@ -155,10 +250,16 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
         setState(() {
           if (data['new_data'] != null) _historyList.insertAll(0, List<Map<String, dynamic>>.from(data['new_data']));
           _selectedStudent = null; _selectedViolations.clear(); _noteCtrl.clear(); _selectedClassFilter = null; _classStudents.clear();
+          _evidenceImage = null;
         });
       } else { throw Exception(data['msg'] ?? (LocalizationService().currentLanguage == 'vi' ? "Lỗi server" : "Server error")); }
     } catch (e) {
-      List<String> bodyParts = ['student_id=${_selectedStudent!['id']}', 'week=${_weekCtrl.text}', 'other_note=${Uri.encodeQueryComponent(_noteCtrl.text)}'];
+      List<String> bodyParts = [
+        'student_id=${_selectedStudent!['id']}',
+        'week=${_weekCtrl.text}',
+        'other_note=${Uri.encodeQueryComponent(_noteCtrl.text)}',
+        'violation_ids=${_selectedViolations.join(',')}'
+      ];
       if (_isCustomTime && _customDateTime != null) {
         String f(int n) => n.toString().padLeft(2, '0');
         String timeStr = '${_customDateTime!.year}-${f(_customDateTime!.month)}-${f(_customDateTime!.day)} ${f(_customDateTime!.hour)}:${f(_customDateTime!.minute)}:00';
@@ -173,7 +274,7 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? '⚠️ Mất mạng! Đã lưu Offline ngầm.' : '⚠️ Offline! Saved locally.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: Colors.orange));
-        setState(() { _selectedStudent = null; _selectedViolations.clear(); _noteCtrl.clear(); _selectedClassFilter = null; _classStudents.clear(); });
+        setState(() { _selectedStudent = null; _selectedViolations.clear(); _noteCtrl.clear(); _selectedClassFilter = null; _classStudents.clear(); _evidenceImage = null; });
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -481,6 +582,87 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
 
                     SizedBox(height: 10),
                     TextField(controller: _noteCtrl, decoration: InputDecoration(hintText: LocalizationService().currentLanguage == 'vi' ? 'Ghi chú thêm...' : 'Ghi chu them...', border: OutlineInputBorder(), isDense: true, fillColor: isDark ? Colors.grey[800] : Colors.white, filled: true)),
+                    SizedBox(height: 12),
+
+                    // Ảnh bằng chứng vi phạm
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.camera_alt, size: 18, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                LocalizationService().currentLanguage == 'vi' ? 'Ảnh bằng chứng vi phạm' : 'Evidence Photo',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_evidenceImage != null) ...[
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    _evidenceImage!,
+                                    height: 120,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: InkWell(
+                                    onTap: _removeEvidence,
+                                    child: CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: Colors.black.withValues(alpha: 0.7),
+                                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _pickEvidence(ImageSource.camera),
+                                  icon: const Icon(Icons.photo_camera, size: 16),
+                                  label: Text(LocalizationService().currentLanguage == 'vi' ? 'Chụp ảnh' : 'Camera', style: const TextStyle(fontSize: 12)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _pickEvidence(ImageSource.gallery),
+                                  icon: const Icon(Icons.photo_library, size: 16),
+                                  label: Text(LocalizationService().currentLanguage == 'vi' ? 'Chọn ảnh' : 'Gallery', style: const TextStyle(fontSize: 12)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -517,6 +699,24 @@ class _GateCheckScreenState extends State<GateCheckScreen> {
                           SizedBox(height: 4),
                           Text('- ${h['violation_name']}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                           Text(h['time_str'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          if (h['evidence_img'] != null && h['evidence_img'].toString().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: InkWell(
+                                onTap: () => _showEvidenceDialog(h['evidence_img'].toString()),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.image, size: 14, color: Colors.blueAccent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      LocalizationService().currentLanguage == 'vi' ? 'Xem ảnh bằng chứng' : 'View evidence',
+                                      style: const TextStyle(fontSize: 11, color: Colors.blueAccent, decoration: TextDecoration.underline),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       trailing: IconButton(icon: Icon(Icons.delete, color: Colors.redAccent), onPressed: () => _deleteRecord(h['id'])),
