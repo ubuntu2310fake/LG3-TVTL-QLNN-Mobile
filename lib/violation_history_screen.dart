@@ -200,6 +200,61 @@ class _ViolationHistoryScreenState extends State<ViolationHistoryScreen> {
     );
   }
 
+  void _showEvidenceDialog(String imgPath) {
+    final url = imgPath.startsWith('http') ? imgPath : '${AppConfig.baseUrl}/$imgPath';
+    showDialog(
+      context: context,
+      builder: (c) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      height: 250,
+                      color: Colors.black54,
+                      child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 180,
+                    color: Colors.black54,
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: Text(
+                        LocalizationService().currentLanguage == 'vi' ? 'Không thể tải ảnh bằng chứng' : 'Could not load evidence image',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const CircleAvatar(
+                  backgroundColor: Colors.black54,
+                  child: Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+                onPressed: () => Navigator.pop(c),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLogItem(dynamic log, bool isGate) {
     // FIX 1: Ép kiểu is_deleted an toàn hơn
     bool isDeleted = log['is_deleted'] == 1 || log['is_deleted'] == '1';
@@ -224,6 +279,24 @@ class _ViolationHistoryScreenState extends State<ViolationHistoryScreen> {
           // FIX 3: Thêm ghi chú hiển thị nếu có
           if (isGate && log['note'] != null && log['note'].toString().trim().isNotEmpty)
              Text(LocalizationService().currentLanguage == "vi" ? "Ghi chú: \"${log['note']}\"" : "Note: \"${log['note']}\"", style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.orange)),
+          if (log['evidence_img'] != null && log['evidence_img'].toString().trim().isNotEmpty)
+             Padding(
+               padding: const EdgeInsets.only(top: 3, bottom: 2),
+               child: InkWell(
+                 onTap: () => _showEvidenceDialog(log['evidence_img'].toString()),
+                 child: Row(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                     const Icon(Icons.image, size: 14, color: Colors.blueAccent),
+                     const SizedBox(width: 4),
+                     Text(
+                       LocalizationService().currentLanguage == 'vi' ? 'Xem ảnh bằng chứng' : 'View evidence',
+                       style: const TextStyle(fontSize: 11, color: Colors.blueAccent, decoration: TextDecoration.underline),
+                     ),
+                   ],
+                 ),
+               ),
+             ),
           Text(isGate ? (LocalizationService().currentLanguage == "vi" ? "Lớp: ${log['class_name'] ?? ''} ${log['student_code'] != null ? '(${log['student_code']})' : ''}" : "Class: ${log['class_name'] ?? ''} ${log['student_code'] != null ? '(${log['student_code']})' : ''}") : (LocalizationService().currentLanguage == "vi" ? "Tuần ${log['week_number'] ?? ''}" : "Week ${log['week_number'] ?? ''}"), style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade500 : Colors.black54)),
           Text(LocalizationService().currentLanguage == "vi" ? "TG: ${isGate ? log['date_created'] : log['submitted_at']} • Báo cáo: ${log['reporter_name'] ?? 'Hệ thống'}" : "Time: ${isGate ? log['date_created'] : log['submitted_at']} • Reporter: ${log['reporter_name'] ?? 'System'}", style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade600 : Colors.grey)),
         ],

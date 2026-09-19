@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'Phiên bản (Ví dụ: 2.0.6_hf11)'
+        description: 'Phiên bản (Ví dụ: 2.1.0)'
         required: false
-        default: '2.0.6_hf11'
+        default: '2.1.0'
       patch_note:
         description: 'Ghi chú cho bản phát hành (Changelog)'
         required: false
-        default: 'Hotfix 2.0.6_hf11: Tự động đánh chặn LG3 Shield/Cloudflare qua AppHttpClient và tự động gửi lại request'
+        default: 'Phát hành phiên bản 2.1.0: Nâng cấp giao diện khảo sát tâm lý, tối ưu trực cổng nề nếp, lịch sử vi phạm và hệ thống đa ngôn ngữ toàn diện'
 
 jobs:
   build_and_release:

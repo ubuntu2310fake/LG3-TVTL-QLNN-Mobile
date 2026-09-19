@@ -2,7 +2,6 @@ import 'localization_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -16,7 +15,6 @@ class ConsultingTestScreen extends StatefulWidget {
 
 class _ConsultingTestScreenState extends State<ConsultingTestScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final Dio _dio = Dio();
   String _sessionId = '';
 
   // Data states
@@ -61,76 +59,106 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
   Future<void> _fetchQuestions() async {
     try {
       final lang = LocalizationService().currentLanguage;
-      final response = await _dio.get('${AppConfig.baseUrl}/api/consulting_questions_api.php?lang=$lang');
+      final response = await AppConfig.client.get(
+        Uri.parse('${AppConfig.baseUrl}/api/consulting_questions_api.php?lang=$lang'),
+      );
       if (response.statusCode == 200) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
-        setState(() {
-          _discData = data['discData'] ?? {};
-          _mtvtData = data['mtvtDb'] ?? {};
-          _hollandData = data['hollandData'] ?? {};
-          _miData = data['miData'] ?? {};
-          _isLoadingData = false;
-        });
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _discData = data['discData'] ?? {};
+            _mtvtData = data['mtvtDb'] ?? {};
+            _hollandData = data['hollandData'] ?? {};
+            _miData = data['miData'] ?? {};
+            _isLoadingData = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingData = false);
       }
     } catch (e) {
-      setState(() => _isLoadingData = false);
+      if (mounted) setState(() => _isLoadingData = false);
     }
   }
 
   Future<void> _fetchHistory() async {
-    setState(() => _isLoadingHistory = true);
+    if (mounted) setState(() => _isLoadingHistory = true);
     try {
-      final response = await _dio.post(
-        '${AppConfig.baseUrl}/consulting_test.php?local_api=history',
-        options: Options(
-          headers: {'Cookie': 'PHPSESSID=$_sessionId'},
-        ),
+      final response = await AppConfig.client.post(
+        Uri.parse('${AppConfig.baseUrl}/consulting_test.php?local_api=history'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({}),
       );
       if (response.statusCode == 200) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        final data = jsonDecode(response.body);
         if (data['success'] == true) {
-          setState(() {
-            _historyData = data['data'] ?? [];
-          });
+          if (mounted) {
+            setState(() {
+              _historyData = data['data'] ?? [];
+            });
+          }
         }
       }
     } catch (e) {
       // Handle error
     } finally {
-      setState(() => _isLoadingHistory = false);
+      if (mounted) setState(() => _isLoadingHistory = false);
     }
   }
 
   Future<void> _saveTest(String testType, Map<String, dynamic> resultData) async {
     try {
-      final response = await _dio.post(
-        '${AppConfig.baseUrl}/consulting_test.php?local_api=save_test',
-        data: {
+      final response = await AppConfig.client.post(
+        Uri.parse('${AppConfig.baseUrl}/consulting_test.php?local_api=save_test'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
           'test_type': testType,
           'result_data': resultData,
-        },
-        options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Cookie': 'PHPSESSID=$_sessionId',
-          },
-        ),
+        }),
       );
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu kết quả thành công!' : 'Saved successfully!')));
-        _fetchHistory();
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu kết quả thành công!' : 'Saved successfully!'),
+              backgroundColor: Colors.green,
+            ));
+          }
+          await _fetchHistory();
+          _tabController.animateTo(4);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(data['msg'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Lỗi khi lưu kết quả' : 'Error saving results')),
+              backgroundColor: Colors.red,
+            ));
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi máy chủ khi lưu kết quả' : 'Server error saving results'),
+            backgroundColor: Colors.red,
+          ));
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi khi lưu kết quả' : 'Error saving results')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(LocalizationService().currentLanguage == 'vi' ? 'Lỗi khi lưu kết quả' : 'Error saving results'),
+          backgroundColor: Colors.red,
+        ));
+      }
     }
   }
 
   Future<void> _deleteHistory(int id) async {
     try {
-      final response = await _dio.post(
-        '${AppConfig.baseUrl}/consulting_test.php?local_api=delete',
-        data: {'id': id},
-        options: Options(headers: {'Cookie': 'PHPSESSID=$_sessionId'}),
+      final response = await AppConfig.client.post(
+        Uri.parse('${AppConfig.baseUrl}/consulting_test.php?local_api=delete'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'id': id}),
       );
       if (response.statusCode == 200) {
         _fetchHistory();
@@ -142,10 +170,10 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
 
   Future<void> _deleteAllHistory() async {
     try {
-      final response = await _dio.post(
-        '${AppConfig.baseUrl}/consulting_test.php?local_api=delete_all',
-        data: {},
-        options: Options(headers: {'Cookie': 'PHPSESSID=$_sessionId'}),
+      final response = await AppConfig.client.post(
+        Uri.parse('${AppConfig.baseUrl}/consulting_test.php?local_api=delete_all'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({}),
       );
       if (response.statusCode == 200) {
         _fetchHistory();
@@ -156,31 +184,50 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
   }
 
   Future<void> _callAIProxy() async {
+    if (_historyData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(LocalizationService().currentLanguage == 'vi'
+            ? 'Bạn chưa hoàn thành bài trắc nghiệm nào để AI tư vấn!'
+            : 'Please complete at least one assessment before requesting AI advice!'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
     setState(() => _isLoadingAI = true);
     try {
       final historySummary = _historyData.map((e) => "${e['test_type']}: ${e['result_data']}").join('\n');
-      final prompt = LocalizationService().currentLanguage == 'vi' ? "Dưới đây là điểm số trắc nghiệm nghề nghiệp của tôi. Hãy tư vấn cho tôi:\n$historySummary" : "Below are my career assessment scores. Please advise me:\n$historySummary";
+      final prompt = LocalizationService().currentLanguage == 'vi'
+          ? "Dưới đây là điểm số trắc nghiệm nghề nghiệp của tôi. Hãy tư vấn cho tôi:\n$historySummary"
+          : "Below are my career assessment scores. Please advise me:\n$historySummary";
       
-      final response = await _dio.post(
-        '${AppConfig.baseUrl}/consulting_test.php?local_api=ai_proxy',
-        data: {
+      final response = await AppConfig.client.post(
+        Uri.parse('${AppConfig.baseUrl}/consulting_test.php?local_api=ai_proxy'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
           'user_text': prompt,
           'lang': LocalizationService().currentLanguage,
-        },
-        options: Options(headers: {'Cookie': 'PHPSESSID=$_sessionId'}),
+        }),
       );
       if (response.statusCode == 200) {
-        final data = response.data is String ? jsonDecode(response.data) : response.data;
-        setState(() {
-          _aiAdvice = data['advice'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Không nhận được phản hồi từ AI' : 'No response from AI');
-        });
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            if (data['advice'] != null && data['advice'].toString().trim().isNotEmpty) {
+              _aiAdvice = data['advice'];
+            } else {
+              _aiAdvice = data['msg'] ?? (LocalizationService().currentLanguage == 'vi' ? 'Không nhận được phản hồi từ AI' : 'No response from AI');
+            }
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _aiAdvice = LocalizationService().currentLanguage == 'vi' ? 'Lỗi kết nối AI: $e' : 'AI connection error: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _aiAdvice = LocalizationService().currentLanguage == 'vi' ? 'Lỗi kết nối AI: $e' : 'AI connection error: $e';
+        });
+      }
     } finally {
-      setState(() => _isLoadingAI = false);
+      if (mounted) setState(() => _isLoadingAI = false);
     }
   }
 
@@ -224,12 +271,13 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
   }
 
   Widget _buildHollandTab(bool isDark) {
-    if (_isLoadingData) return Center(child: CircularProgressIndicator());
+    if (_isLoadingData) return const Center(child: CircularProgressIndicator());
+    final isVi = LocalizationService().currentLanguage == 'vi';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(LocalizationService().currentLanguage == 'vi' ? 'Trắc nghiệm Holland (RIASEC)' : 'Holland Test (RIASEC)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        SizedBox(height: 10),
+        Text(isVi ? 'Trắc nghiệm Holland (RIASEC)' : 'Holland Test (RIASEC)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
         ..._hollandData.keys.map((group) {
           final List<dynamic> questions = _hollandData[group] ?? [];
           return Column(
@@ -237,43 +285,53 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhóm $group' : 'Group $group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: Text(isVi ? 'Nhóm $group' : 'Group $group', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
               ...questions.map((q) => CheckboxListTile(
                 title: Text(q['text'].toString()),
-                value: _hollandAnswers['${q['code']}'] ?? false,
-                onChanged: (v) => setState(() => _hollandAnswers['${q['code']}'] = v ?? false),
+                value: _hollandAnswers['$group-${q['code']}'] ?? false,
+                onChanged: (v) => setState(() => _hollandAnswers['$group-${q['code']}'] = v ?? false),
               )),
             ],
           );
         }),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         ElevatedButton(
           onPressed: () {
+            bool hasAnswer = false;
             Map<String, int> scores = {'R':0, 'I':0, 'A':0, 'S':0, 'E':0, 'C':0};
             _hollandData.forEach((group, questions) {
               for (var q in questions) {
-                if (_hollandAnswers['${q['code']}'] == true) {
+                if (_hollandAnswers['$group-${q['code']}'] == true) {
                   scores[group] = (scores[group] ?? 0) + 1;
+                  hasAnswer = true;
                 }
               }
             });
+            if (!hasAnswer) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isVi ? 'Vui lòng chọn ít nhất 1 đặc điểm!' : 'Please select at least 1 trait!'),
+                backgroundColor: Colors.orange,
+              ));
+              return;
+            }
             _saveTest('HOLLAND', scores);
           },
           style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-          child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: TextStyle(color: Colors.white)),
+          child: Text(isVi ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: const TextStyle(color: Colors.white)),
         )
       ],
     );
   }
 
   Widget _buildMITab(bool isDark) {
-    if (_isLoadingData) return Center(child: CircularProgressIndicator());
+    if (_isLoadingData) return const Center(child: CircularProgressIndicator());
+    final isVi = LocalizationService().currentLanguage == 'vi';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(LocalizationService().currentLanguage == 'vi' ? 'Trắc nghiệm Đa trí tuệ (MI)' : 'Multiple Intelligences (MI)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        SizedBox(height: 10),
+        Text(isVi ? 'Trắc nghiệm Đa trí tuệ (MI)' : 'Multiple Intelligences (MI)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
         ..._miData.keys.map((group) {
           final List<dynamic> questions = _miData[group] ?? [];
           return Column(
@@ -281,43 +339,53 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhóm $group' : 'Group $group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: Text(isVi ? 'Nhóm $group' : 'Group $group', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
               ...questions.map((q) => CheckboxListTile(
                 title: Text(q['text'].toString()),
-                value: _miAnswers['${q['code']}'] ?? false,
-                onChanged: (v) => setState(() => _miAnswers['${q['code']}'] = v ?? false),
+                value: _miAnswers['$group-${q['code']}'] ?? false,
+                onChanged: (v) => setState(() => _miAnswers['$group-${q['code']}'] = v ?? false),
               )),
             ],
           );
         }),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         ElevatedButton(
           onPressed: () {
+            bool hasAnswer = false;
             Map<String, int> scores = {};
             _miData.forEach((group, questions) {
               scores[group] = 0;
               for (var q in questions) {
-                if (_miAnswers['${q['code']}'] == true) {
+                if (_miAnswers['$group-${q['code']}'] == true) {
                   scores[group] = (scores[group] ?? 0) + 1;
+                  hasAnswer = true;
                 }
               }
             });
+            if (!hasAnswer) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isVi ? 'Vui lòng chọn ít nhất 1 đặc điểm!' : 'Please select at least 1 trait!'),
+                backgroundColor: Colors.orange,
+              ));
+              return;
+            }
             _saveTest('MI', scores);
           },
           style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-          child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: TextStyle(color: Colors.white)),
+          child: Text(isVi ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: const TextStyle(color: Colors.white)),
         )
       ],
     );
   }
 
   Widget _buildDISCTab(bool isDark) {
-    if (_isLoadingData) return Center(child: CircularProgressIndicator());
+    if (_isLoadingData) return const Center(child: CircularProgressIndicator());
+    final isVi = LocalizationService().currentLanguage == 'vi';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(LocalizationService().currentLanguage == 'vi' ? 'Nhận diện Hành vi (DISC)' : 'Behavioral Test (DISC)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(isVi ? 'Nhận diện Hành vi (DISC)' : 'Behavioral Test (DISC)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ..._discData.keys.map((group) {
           final List<dynamic> questions = _discData[group] ?? [];
           return Column(
@@ -325,7 +393,7 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(LocalizationService().currentLanguage == 'vi' ? 'Nhóm $group' : 'Group $group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: Text(isVi ? 'Nhóm $group' : 'Group $group', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
               ...questions.map((q) => CheckboxListTile(
                 title: Text(q.toString()),
@@ -337,32 +405,41 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
         }),
         ElevatedButton(
           onPressed: () {
-            Map<String, int> scores = {};
+            bool hasAnswer = false;
+            Map<String, int> scores = {'D': 0, 'I': 0, 'S': 0, 'C': 0};
             _discData.forEach((group, questions) {
               scores[group] = 0;
               for (var q in questions) {
                 if (_discAnswers['$group-$q'] == true) {
-                  scores[group] = (scores[group] ?? 0) + 1;
+                  scores[group] = (scores[group] ?? 0) + 10;
+                  hasAnswer = true;
                 }
               }
             });
+            if (!hasAnswer) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isVi ? 'Vui lòng chọn ít nhất 1 đặc điểm!' : 'Please select at least 1 trait!'),
+                backgroundColor: Colors.orange,
+              ));
+              return;
+            }
             _saveTest('DISC', scores);
           },
           style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-          child: Text(LocalizationService().currentLanguage == 'vi' ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: TextStyle(color: Colors.white)),
+          child: Text(isVi ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: const TextStyle(color: Colors.white)),
         )
       ],
     );
   }
 
   Widget _buildMTVTTab(bool isDark) {
-    if (_isLoadingData) return Center(child: CircularProgressIndicator());
+    if (_isLoadingData) return const Center(child: CircularProgressIndicator());
     final isVi = LocalizationService().currentLanguage == 'vi';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(isVi ? 'Bài test Động lực (MTVT)' : 'Motivators Test (MTVT)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        SizedBox(height: 10),
+        Text(isVi ? 'Bài test Động lực (MTVT)' : 'Motivators Test (MTVT)', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
         ..._mtvtData.keys.map((group) {
           final hList = _mtvtData[group]['h'] ?? [];
           final lList = _mtvtData[group]['l'] ?? [];
@@ -374,26 +451,26 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(isVi ? 'Động lực: $group' : 'Motivator: $group', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: primaryColor)),
-                  SizedBox(height: 10),
-                  Text(isVi ? 'ĐỘNG LỰC CAO' : 'HIGH MOTIVATION', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                  const SizedBox(height: 10),
+                  Text(isVi ? 'ĐỘNG LỰC CAO' : 'HIGH MOTIVATION', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
                   ...hList.asMap().entries.map((entry) {
                     final idx = entry.key;
                     final q = entry.value;
                     return CheckboxListTile(
-                      title: Text(q.toString(), style: TextStyle(fontSize: 14)),
+                      title: Text(q.toString(), style: const TextStyle(fontSize: 14)),
                       value: _mtvtAnswers['${group}_h_$idx'] ?? false,
                       onChanged: (v) => setState(() => _mtvtAnswers['${group}_h_$idx'] = v ?? false),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     );
                   }),
-                  SizedBox(height: 10),
-                  Text(isVi ? 'ĐỘNG LỰC THẤP' : 'LOW MOTIVATION', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                  const SizedBox(height: 10),
+                  Text(isVi ? 'ĐỘNG LỰC THẤP' : 'LOW MOTIVATION', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
                   ...lList.asMap().entries.map((entry) {
                     final idx = entry.key;
                     final q = entry.value;
                     return CheckboxListTile(
-                      title: Text(q.toString(), style: TextStyle(fontSize: 14)),
+                      title: Text(q.toString(), style: const TextStyle(fontSize: 14)),
                       value: _mtvtAnswers['${group}_l_$idx'] ?? false,
                       onChanged: (v) => setState(() => _mtvtAnswers['${group}_l_$idx'] = v ?? false),
                       controlAffinity: ListTileControlAffinity.leading,
@@ -407,24 +484,38 @@ class _ConsultingTestScreenState extends State<ConsultingTestScreen> with Single
         }),
         ElevatedButton(
           onPressed: () {
+            bool hasAnswer = false;
             Map<String, int> scores = {};
             _mtvtData.forEach((group, _) { scores[group] = 50; });
             _mtvtData.forEach((group, items) {
               final hList = items['h'] ?? [];
               for (int i=0; i<hList.length; i++) {
-                if (_mtvtAnswers['${group}_h_$i'] == true) scores[group] = (scores[group] ?? 50) + 5;
+                if (_mtvtAnswers['${group}_h_$i'] == true) {
+                  scores[group] = (scores[group] ?? 50) + 5;
+                  hasAnswer = true;
+                }
               }
               final lList = items['l'] ?? [];
               for (int i=0; i<lList.length; i++) {
-                if (_mtvtAnswers['${group}_l_$i'] == true) scores[group] = (scores[group] ?? 50) - 5;
+                if (_mtvtAnswers['${group}_l_$i'] == true) {
+                  scores[group] = (scores[group] ?? 50) - 5;
+                  hasAnswer = true;
+                }
               }
             });
+            if (!hasAnswer) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isVi ? 'Vui lòng chọn ít nhất 1 đặc điểm!' : 'Please select at least 1 trait!'),
+                backgroundColor: Colors.orange,
+              ));
+              return;
+            }
             _saveTest('MTVT', scores);
           },
           style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-          child: Text(isVi ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: TextStyle(color: Colors.white)),
+          child: Text(isVi ? 'Lưu vào Hệ thống & Xem kết quả' : 'Save & View Results', style: const TextStyle(color: Colors.white)),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
       ],
     );
   }
